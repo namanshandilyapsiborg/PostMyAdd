@@ -240,6 +240,7 @@ function showUpdateScreen(eventname)
         {
              if(frontendChannel)
              {
+                console.log("//=== yes frontend channel exist ===//")
                 let data = {
                     eventname : "play",
                     filename : "updating",
