@@ -1,4 +1,4 @@
-console.log("//============= Skai BAckend has been started ==============//")
+console.log("//============= PostMyadd BAckend has been started ==============//")
 const { pubnub } = require("./pubnub-module");
 const download = require("download");
 const unzipper = require("unzipper");
@@ -17,6 +17,7 @@ const { stdout, mainModule, stderr } = require("process");
 const schedule = require("node-schedule");
 
 let masterChannel = "c3RvcmFnZS5zYXBzLm9uZQ=="           ///=====> For server Backend
+let postmyaddChannel = "cG9zdE15QWRkQ2hhbm5lbA=="        ///===> For PostMybAckend update channel
 
 const config = {
     repository: "https://github.com/namanshandilyapsiborg/PostMyAdd",
@@ -67,7 +68,7 @@ function getChannel() {
         frontendChannel = mcadd1[0].macaddress
         a.push(mcadd[0].macaddress);
         //let SkaiChannel = "c2thaVVwZGF0ZUNoYW5uZWw="
-        let postmyaddChannel = "cG9zdE15QWRkQ2hhbm5lbA=="
+        //let postmyaddChannel = "cG9zdE15QWRkQ2hhbm5lbA=="
         a.push(postmyaddChannel)
         pubnub.subscribe({
             channels: a,
@@ -95,8 +96,9 @@ pubnub.addListener({
         console.log(e.category === "PNNetworkDownCategory");
     },
     message: function (messageEvent) {
-        console.log("Message From Pubnub ===> ", messageEvent.message);
-        if(messageEvent.channel == "c2thaVVwZGF0ZUNoYW5uZWw=")
+        console.log("Message From Pubnub ===> ",messageEvent.message);
+        //if(messageEvent.channel == "c2thaVVwZGF0ZUNoYW5uZWw=")
+        if(messageEvent.channel == postmyaddChannel)
         {
         //=====================================================================//
         if (messageEvent.message.eventname == "update") {
