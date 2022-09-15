@@ -537,7 +537,7 @@ button.watch((err, value) => {
     if (value == 1) {
         pubnub.publish(
             {
-                channel: publishChannel,
+                channel: frontendChannel,
                 message: {
                     eventname: "qrcode",
                     show: true,
@@ -551,7 +551,7 @@ button.watch((err, value) => {
     } else if (value == 0) {
         pubnub.publish(
             {
-                channel: publishChannel,
+                channel: frontendChannel,
                 message: {
                     eventname: "qrcode",
                     show: false,
