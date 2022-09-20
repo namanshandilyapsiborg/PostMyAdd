@@ -237,32 +237,38 @@ function PlayPauseVideo(data)
 }
 
 
-function showUpdateScreen(eventname)
+async function showUpdateScreen(eventname)
 {
-    if(eventname && eventname == "updateScreenEnabled") 
+    try{
+        if(eventname && eventname == "updateScreenEnabled") 
         {
-             if(frontendChannel)
-             {
-                console.log("//=== yes frontend channel exist ===//")
-                let data = {
-                    eventname : "play",
-                    filename : "updating",
-                    displaytype : "fullscreen",
-                    filetype : "updating"
-                }
-                if(data)
+            let versionChecker = await updater.compareVersions();
+            console.log("Version Inside showUpdateScreen ===> ", versionChecker)
+            if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) 
+            {
+                if(frontendChannel)
                 {
-                    pubnub.publish(
-                        {
-                            channel: frontendChannel,
-                            message: data,
-                        },
-                        (status, response) => {
-                            console.log("Status Pubnub ===> ", status);
-                        }
-                    );
-                }  
-             }
+                   console.log("//=== yes frontend channel exist ===//")
+                   let data = {
+                       eventname : "play",
+                       filename : "updating",
+                       displaytype : "fullscreen",
+                       filetype : "updating"
+                   }
+                   if(data)
+                   {
+                       pubnub.publish(
+                           {
+                               channel: frontendChannel,
+                               message: data,
+                           },
+                           (status, response) => {
+                               console.log("Status Pubnub ===> ", status);
+                           }
+                       );
+                   }  
+                }
+            }        
         }
     if(eventname && eventname == "updateScreenDisabled")
     {
@@ -288,6 +294,13 @@ function showUpdateScreen(eventname)
            }  
         }
     }    
+
+    }catch(e)
+    {
+        console.log("Error in UpdateScreen Function")
+        return ;
+    }
+    
 }
 
 
