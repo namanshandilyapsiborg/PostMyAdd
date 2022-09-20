@@ -464,7 +464,7 @@ function DeleteUserFiles(uniquefilename, filetype) {
 //=============================== Auto Starting Backend =====================================//
 async function frontendStart()
 {
-    setTimeout(async() => {
+    let masterTimer = setTimeout(async() => {
         let {stdout} =  await exec("npm start", { cwd: "./Saps_Rasp_Pubnub" });
         if(stdout)
         {
@@ -486,6 +486,7 @@ async function frontendStart()
                           
                         }
                             clearTimeout(timer2)
+                            clearTimeout(masterTimer)
                         }, 50000);
 
             // let timer2  = setTimeout(async() => {
@@ -841,7 +842,7 @@ async function autoUpdateTimer() {
             exec("pkill -f firefox")
              setTimeout(()=>{
                  exec("sudo reboot");
-             },5000)
+             },15000)
          })    
          });
          console.log("//====== Timer Completed =====//")
