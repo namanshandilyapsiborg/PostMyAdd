@@ -171,13 +171,13 @@ function App() {
               src={qrcode}
             />
             <Typography style={{ color: "white", marginBottom: "15px" }}>
-              NOT CONNECTED TO INTERNET:{" "}
+              NOT CONNECTED TO INTERNET{" "}
             </Typography>
-            <Typography style={{ color: "white", marginBottom: "10px" }}>
+            <Typography style={{ color: "white", marginBottom: "22px" }}>
               Steps To Connect To WiFi:{" "}
             </Typography>
             <Typography style={{ color: "white", marginBottom: "10px" }}>
-              1. Press & Hold Button 4 On Device For 3 Second{" "}
+              1. Press & Hold Button 4 On Device For 3 Seconds{" "}
             </Typography>
             <Typography style={{ color: "white", marginBottom: "10px" }}>
               2. Turn ON your Mobile WiFi, Scan Your Device{" "}
