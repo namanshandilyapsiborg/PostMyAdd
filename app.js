@@ -234,6 +234,21 @@ function PlayPauseVideo(data)
                     }
                 );
              }
+
+
+             pubnub.publish(
+                {
+                    channel: masterChannel,
+                    message: {
+                        mac_id :  publishChannel,
+                        eventname : "playresp",
+                        status : played
+                    },
+                },
+                (status, response) => {
+                    console.log("Status Pubnub ===> ", status);
+                }
+            );             
           }
         }
         if (data && data.filetype == "video/mp4") 
@@ -254,6 +269,20 @@ function PlayPauseVideo(data)
                     }
                 );
              }
+
+             pubnub.publish(
+                {
+                    channel: masterChannel,
+                    message: {
+                        mac_id :  publishChannel,
+                        eventname : "playresp",
+                        status : played
+                    },
+                },
+                (status, response) => {
+                    console.log("Status Pubnub ===> ", status);
+                }
+            );             
           }
         }
         if (data && data.filetype == "url") 
@@ -271,6 +300,21 @@ function PlayPauseVideo(data)
                     }
                 );
              }
+
+
+             pubnub.publish(
+                {
+                    channel: masterChannel,
+                    message: {
+                        mac_id :  publishChannel,
+                        eventname : "playresp",
+                        status : played
+                    },
+                },
+                (status, response) => {
+                    console.log("Status Pubnub ===> ", status);
+                }
+            );
         }
     }
     else if(data.eventname == "stop")
@@ -287,6 +331,20 @@ function PlayPauseVideo(data)
                }
            );
         }
+
+        pubnub.publish(
+            {
+                channel: masterChannel,
+                message: {
+                    mac_id :  publishChannel,
+                    eventname : "playresp",
+                    status : stopped
+                },
+            },
+            (status, response) => {
+                console.log("Status Pubnub ===> ", status);
+            }
+        );
     }
    
 }
