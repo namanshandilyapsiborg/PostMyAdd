@@ -207,6 +207,7 @@ function checkSpace()
 })
 }
 
+checkSpace();
 
 
 //===> To play Pause 
