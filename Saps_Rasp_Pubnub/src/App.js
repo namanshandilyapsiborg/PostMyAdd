@@ -15,7 +15,8 @@ import macadd from "./macadd.json";
 import { Typography } from "@mui/material";
 //============================== PUBNUB Initialization ===================================//
 import PubNub from "pubnub";
-import ReactPlayer from "react-player/youtube";
+// import ReactPlayer from "react-player/youtube";
+import ReactPlayer from "react-player/lazy";
 import { PubNubProvider, usePubNub } from "pubnub-react";
 //let macadd = "1234"
 const pubnub = new PubNub({
@@ -262,10 +263,12 @@ function App() {
                                 <>
                                   <video
                                     style={{
-                                      backgroundColor: "red",
-                                      objectFit: "cover",
+                                      // backgroundColor: "red",
+                                      objectFit: "contain",
                                       minHeight: "100%",
                                       minWidth: "100%",
+                                      height: "100%",
+                                      width: "100%",
                                     }}
                                     controls
                                     loop
@@ -283,10 +286,12 @@ function App() {
                               {filetype && filetype == "image/jpeg" && (
                                 <img
                                   style={{
-                                    objectFit: "cover",
+                                    objectFit: "contain",
                                     minHeight: "100%",
                                     minWidth: "100%",
-                                    backgroundSize: "cover",
+                                    height: "100%",
+                                    width: "100%",
+                                    backgroundSize: "contain",
                                     backgroundPosition: "center",
                                     backgroundRepeat: "no-repeat",
                                   }}
