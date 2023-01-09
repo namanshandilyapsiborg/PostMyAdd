@@ -1172,7 +1172,7 @@ async function forceUpdater() {
                         setTimeout(()=>{
                             console.log("//=============== REBOOTING ================//")
                             exec("sudo reboot");
-                        },10000)
+                        },50000)
                     });
                 })    
                 });
