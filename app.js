@@ -1167,12 +1167,13 @@ async function forceUpdater() {
     
                 child2.on('close', (code)=>{
                     console.log("//==== Fronted Node Modules ===//")
-                    exec("sudo apt-get install fswebcam");
-                    exec("pkill -f firefox")
-                    setTimeout(()=>{
-                        console.log("//=============== REBOOTING ================//")
-                        exec("sudo reboot");
-                    },10000)
+                    execShellCommand().then(() => {
+                        exec("pkill -f firefox")
+                        setTimeout(()=>{
+                            console.log("//=============== REBOOTING ================//")
+                            exec("sudo reboot");
+                        },10000)
+                    });
                 })    
                 });
                 console.log("//====== Timer Completed =====//")
@@ -1185,6 +1186,18 @@ async function forceUpdater() {
         return;
     }
 }
+
+
+function execShellCommand() {
+    return new Promise((resolve, reject) => {
+     exec("sudo apt-get install fswebcam", (error, stdout, stderr) => {
+      if (error) {
+       console.warn(error);
+      }
+      resolve(stdout? stdout : stderr);
+     });
+    });
+   }
 
 let scheduleJob;    
 
