@@ -495,6 +495,16 @@ async function sendPhotoToServer(orderId, photo){
     }
 }
 
+Webcam.list( function( list ) {
+
+    //Use another device
+
+    var anotherCam = NodeWebcam.create( { device: list[ 1 ] } );
+
+    console.log(anotherCam);
+
+});
+
 
 async function click_photo(){
         await NodeWebcam.capture( `./images/photo.jpg`, opts, function( err, data ) {
