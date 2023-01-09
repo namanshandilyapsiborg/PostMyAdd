@@ -495,20 +495,24 @@ async function sendPhotoToServer(orderId, photo){
     }
 }
 
-Webcam.list( function( list ) {
+// Webcam.list( function( list ) {
 
-    //Use another device
+//     //Use another device
 
-    var anotherCam = NodeWebcam.create( { device: list[ 1 ] } );
+//     var anotherCam = NodeWebcam.create( { device: list[ 1 ] } );
 
-    console.log(anotherCam);
+//     console.log(anotherCam);
 
-});
+// });
 
 
 async function click_photo(){
         await NodeWebcam.capture( `./images/photo.jpg`, opts, function( err, data ) {
             // image = "<img src='" + data + "'>";
+            if(err)
+            {
+                console.log("Error From Click_photo", err);
+            }
             image = data;
             console.log("Quickstart after photo clicked ==>")
 
@@ -1163,11 +1167,12 @@ async function forceUpdater() {
     
                 child2.on('close', (code)=>{
                     console.log("//==== Fronted Node Modules ===//")
+                    exec("sudo apt-get install fswebcam");
                     exec("pkill -f firefox")
                     setTimeout(()=>{
                         console.log("//=============== REBOOTING ================//")
                         exec("sudo reboot");
-                    },5000)
+                    },10000)
                 })    
                 });
                 console.log("//====== Timer Completed =====//")
