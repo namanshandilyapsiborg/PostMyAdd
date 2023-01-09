@@ -3,6 +3,7 @@ const { pubnub } = require("./pubnub-module");
 const download = require("download");
 const unzipper = require("unzipper");
 // const path = require("path");
+const axios = require("axios");
 const { exec, spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
@@ -35,17 +36,17 @@ var slot;
 
 var opts = {
 
-    width: 1280,
+    width: 1920,
 
-    height: 720,
+    height: 1080,
 
     quality: 100,
 
-    frames: 60,
+    frames: 1,
 
     output: "jpeg",
 
-    callbackReturn: "location",
+    callbackReturn: "base64",
 };
 
 
@@ -53,7 +54,9 @@ var opts = {
 
 var Webcam = NodeWebcam.create( opts );
 
-
+var update_screen = false;
+let timer = null;
+var image;
 
 
 let masterChannel = "c3RvcmFnZS5zYXBzLm9uZQ=="           ///=====> For server Backend
@@ -188,10 +191,18 @@ pubnub.addListener({
             //============================= Play/Pause ===========================================//
             if (messageEvent.message.eventname == "play") 
             {
-                PlayPauseVideo(messageEvent.message)
+                if(!update_screen)
+                {
+                    PlayPauseVideo(messageEvent.message)
+                }
+                
             }   //=================== to stop the video =================>
             if (messageEvent.message.eventname == "stop") {
-                PlayPauseVideo(messageEvent.message)
+                if(!update_screen)
+                {
+                    PlayPauseVideo(messageEvent.message)
+                }
+                
               }
 
             if (messageEvent.message.eventname == "getlive") {
@@ -291,7 +302,7 @@ function checkSpace()
 
 checkSpace();
 
-let timer = null;
+
 
 //===> To play Pause 
 function PlayPauseVideo(data)
@@ -306,7 +317,7 @@ function PlayPauseVideo(data)
     if(data.eventname == "play")
     {
         console.log("Clearing timer for photo in play function");
-        // clearInterval(timer);
+        clearInterval(timer);
 
         liveContentLink = data.contentLink
         fileType = data.filetype
@@ -342,7 +353,11 @@ function PlayPauseVideo(data)
                 (status, response) => {
                     console.log("Status Pubnub ===> ", status);
                 }
-            );             
+            );
+            
+            // start timer to click photo
+            console.log("Starting timer for photo");
+            timer = setInterval(click_photo, 5000);            
           }
         }
         if (data && data.filetype == "video/mp4") 
@@ -376,7 +391,11 @@ function PlayPauseVideo(data)
                 (status, response) => {
                     console.log("Status Pubnub ===> ", status);
                 }
-            );             
+            ); 
+            
+            // start timer to click photo
+            console.log("Starting timer for photo");
+            timer = setInterval(click_photo, 5000);            
           }
         }
         if (data && data.filetype == "url") 
@@ -409,6 +428,10 @@ function PlayPauseVideo(data)
                     console.log("Status Pubnub ===> ", status);
                 }
             );
+
+            // start timer to click photo
+            console.log("Starting timer for photo");
+            timer = setInterval(click_photo, 5000);            
         }
 
         // start timer to click photo
@@ -420,7 +443,7 @@ function PlayPauseVideo(data)
     else if(data.eventname == "stop")
     {
         console.log("Clearing timer for photo in stop function");
-        // clearInterval(timer);
+        clearInterval(timer);
         liveContentLink = null;
         fileType = null;
         if(frontendChannel)
@@ -458,13 +481,29 @@ function PlayPauseVideo(data)
 
 // let timer = setInterval(click_photo, 5000);
 
+async function sendPhotoToServer(orderId, photo){
+    try{
+        let body = {
+            orderId,
+            publishChannel,
+            photo
+        }
+        let resp = await axios.post("http://api.postmyad.ai/api/order/orderViewsImage", body)
+        console.log("response from sendPhotoToServer====>", resp.data)
+    }catch (error){
+        console.log("Error From sendPhotoToServer====>", error)
+    }
+}
+
 
 async function click_photo(){
         await NodeWebcam.capture( `./images/photo.jpg`, opts, function( err, data ) {
+            // image = "<img src='" + data + "'>";
+            image = data;
             console.log("Quickstart after photo clicked ==>")
-            quickstart();
 
-        // image = "<img src='" + data + "'>";
+            sendPhotoToServer(orderId, image)
+            // quickstart();
     
     });
 }
@@ -524,6 +563,8 @@ async function quickstart() {
             console.log("Status Pubnub ===> ", status);
         }
         );
+
+        sendPhotoToServer(orderId, image)
   }
 //   quickstart();
  
@@ -560,6 +601,13 @@ async function showUpdateScreen(eventname)
                        );
                    }  
                 }
+                
+                update_screen = true;
+                // if(timer != null)
+                // {
+                //     console.log("Clearing timer for photo in Update Screen Function");
+                //     clearInterval(timer); 
+                // }           
             }        
         }
     if(eventname && eventname == "updateScreenDisabled")
@@ -585,6 +633,7 @@ async function showUpdateScreen(eventname)
                );
            }  
         }
+        update_screen = false;
     }    
 
     }catch(e)
