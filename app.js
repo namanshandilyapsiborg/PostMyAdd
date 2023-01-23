@@ -280,7 +280,7 @@ function checkSpace()
     totalSpace = totalSpace.toFixed(3);
     freeSpace = freeSpace.toFixed(3);
 
-    console.log("Total Space in GB",totalSpace);
+    console.log("Total Space in gIGA bYT3",totalSpace);
     console.log("Free Space in GB",freeSpace);
 
     pubnub.publish(
