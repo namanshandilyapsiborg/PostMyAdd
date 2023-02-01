@@ -100,6 +100,8 @@ let a = [];
 let liveContentLink;
 let fileType;
 
+let frontendstarted = false;
+
 //========================= Getting MAcID ======================//
 function getChannel() {
     if (fs.existsSync("./realmacadd.json") && fs.existsSync("./frontendMac.json") ) {
@@ -188,6 +190,33 @@ pubnub.addListener({
                     messageEvent.message.filetype
                 );
             }
+
+
+            if (messageEvent.message.eventname == "get_device_file") 
+            {
+                //console.log("Eventname => ", messageEvent.message.eventname);
+                if(frontendstarted)
+                {
+                    getUserFilesName(messageEvent.message.filetype);
+                }
+                else{
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id :  publishChannel,
+                                eventname : "resp_get_device_file",
+                                status: "Get Device File Failure",
+                            },
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
+                }
+                
+            } 
+
             //============================= Play/Pause ===========================================//
             if (messageEvent.message.eventname == "play") 
             {
@@ -789,6 +818,67 @@ function DownloadVideoZip(fileurl, zipname, filetype) {
     }
 }
 
+
+const imageFolder = './Saps_Rasp_Pubnub/src/Images/';
+const videoFolder = './Saps_Rasp_Pubnub/src/Videos/';
+
+// function createdDate (fileFolder, file) {  
+//   const { birthtime } = fs.statSync(`${fileFolder}${file}`)
+
+//   return birthtime
+// }
+
+async function readFileNameAndTime (fileFolder, filetype) { 
+    
+    try{
+
+        let file = await fs.promises.readdir(fileFolder)
+
+        let body = {
+            files:file,
+            deviceMacId:publishChannel,
+            fileType:filetype
+        }
+
+        let resp = await axios.post("http://api.postmyad.ai/api/device/deviceGallery/deviceFiles", body)
+        console.log("response from sendPhotoToServer====>", resp.data)
+
+        pubnub.publish(
+            {
+                channel: masterChannel,
+                message: {
+                    mac_id :  publishChannel,
+                    eventname : "resp_get_device_file",
+                    status: "Get Device File Success",
+                },
+            },
+            (status, response) => {
+                console.log("Status Pubnub ===> ", status);
+            }
+        );
+        
+    }catch (error){
+        console.log("Error From sendPhotoToServer====>", error)
+    }
+
+  }
+
+
+async function getUserFilesName(filetype) {
+
+    if(filetype === "video/mp4")
+    {
+        await readFileNameAndTime (videoFolder, filetype)
+    }
+    else if(filetype === "image/jpeg")
+    {
+        await readFileNameAndTime (imageFolder, filetype)
+    }
+
+}
+
+
+
 //=================== Delete files ==========================//
 // Saps_Rasp_Pubnub/src/Videos
 function DeleteUserFiles(uniquefilename, filetype) {
@@ -838,6 +928,7 @@ async function frontendStart()
                                 if(stdout)
                                 {
                                     console.log("//========= F11 Command has been executed ====//")
+                                    frontendstarted = true;
                                 }
                                 clearTimeout(timer3)
                             },6000)
@@ -1148,7 +1239,7 @@ async function forceUpdater() {
                     ); 
              }
         clearTimeout(updateTimer);
-        },15000)
+        },25000)
             
             let timer = setTimeout(() => {
                 const child = spawn('npm i', {
