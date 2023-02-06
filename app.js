@@ -99,6 +99,7 @@ let a = [];
 //for live content
 let liveContentLink;
 let fileType;
+let burnerad;
 
 let frontendstarted = false;
 
@@ -173,6 +174,16 @@ pubnub.addListener({
             checkSpace();
     }
 
+    if (messageEvent.message.eventname == "download_burner_ad") {
+        console.log("//===Downloading Burner ad=========//")
+        DownloadBurnerAdZip(
+            // ==> Download Function
+            messageEvent.message.fileurl,
+            messageEvent.message.uniquefilename,
+            messageEvent.message.filetype
+        );
+}
+
         }
         else{
 
@@ -202,6 +213,18 @@ pubnub.addListener({
                     messageEvent.message.filetype
                 );
             }
+
+
+            if (messageEvent.message.eventname == "download_burner_ad") {
+                console.log("//===Downloading Burner ad=========//")
+                DownloadBurnerAdZip(
+                    // ==> Download Function
+                    messageEvent.message.fileurl,
+                    messageEvent.message.uniquefilename,
+                    messageEvent.message.filetype
+                );
+            }
+
             if (messageEvent.message.eventname == "delete_user_file") {
                 //console.log("Eventname => ", messageEvent.message.eventname);
                 DeleteUserFiles(
@@ -405,7 +428,7 @@ function PlayPauseVideo(data)
             
             // start timer to click photo
             console.log("Starting timer for photo");
-            timer = setInterval(click_photo, 5000);            
+            timer = setInterval(click_photo, 10000);            
           }
         }
         if (data && data.filetype == "video/mp4") 
@@ -443,7 +466,7 @@ function PlayPauseVideo(data)
             
             // start timer to click photo
             console.log("Starting timer for photo");
-            timer = setInterval(click_photo, 5000);            
+            timer = setInterval(click_photo, 10000);            
           }
         }
         if (data && data.filetype == "url") 
@@ -479,7 +502,7 @@ function PlayPauseVideo(data)
 
             // start timer to click photo
             console.log("Starting timer for photo");
-            timer = setInterval(click_photo, 5000);            
+            timer = setInterval(click_photo, 10000);            
         }
 
         // start timer to click photo
@@ -492,8 +515,14 @@ function PlayPauseVideo(data)
     {
         console.log("Clearing timer for photo in stop function");
         clearInterval(timer);
+
+        console.log("Burner ad list----->",burnerad);
+
+        const random = Math.floor(Math.random()*burnerad.length)
+
         liveContentLink = null;
-        fileType = null;
+        data["filetype"] = "burnerad";
+        data["filename"] = burnerad[random];
         if(frontendChannel)
         {
            pubnub.publish(
@@ -661,6 +690,20 @@ async function showUpdateScreen(eventname)
                                console.log("Status Pubnub ===> ", status);
                            }
                        );
+
+                       pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id :  publishChannel,
+                                eventname : "updatescreenresp",
+                                status : "started"
+                            },
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
                    }  
                 }
                 
@@ -838,8 +881,146 @@ function DownloadVideoZip(fileurl, zipname, filetype) {
 }
 
 
+
+
+//==================== To Download BurnerAd ====================//
+function DownloadBurnerAdZip(fileurl, zipname, filetype) {
+    console.log("Inside DownloadBurnerAdZip ==> ", fileurl);
+    if (fileurl && zipname && filetype) {
+        const file = fileurl;
+
+        checkSpace();
+
+        //===> for video download ====>
+        if (filetype == "video/mp4") {
+            console.log(" //=== Video/mp4 ======//");
+            //====> first check if video already downloaded
+            if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/BurnerAd/${zipname}.mp4`)))
+            {
+                console.log("//=== File already exist =======//")
+                //===> Pubnub Publish of Download Completion ===>
+                let timer = setTimeout(()=>{
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id :  publishChannel,
+                                eventname : "Downloaded",
+                                status : "Video Already Exist",
+                                filename : zipname,
+                                filetype : "video/mp4"
+                            },
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
+                clearTimeout(timer)
+                },3000)
+                return ;
+            }
+            else 
+            {
+                const filePath = `${__dirname}/zippedfiles`;
+
+                download(file, filePath).then(() => {
+                    console.log("//==   Video Download Completed   ==//");
+    
+                    //============ Now unzip the file ==================//
+                    console.log("Inside Zip file name ==>", zipname);
+                    const path = `./zippedfiles/${zipname}.zip`;
+                    console.log("path ==>", path);
+    
+                    fs.createReadStream(path).pipe(
+                        unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
+                    );
+                    setTimeout(() => {
+                        fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
+                            console.log("deleted");
+                        });
+                    }, 1000);
+                    //===> Pubnub Publish of Download Completion ===>
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id :  publishChannel,
+                                eventname : "Downloaded",
+                                status : "Download Success",
+                                filename : zipname,
+                                filetype : "video/mp4"
+                            },
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
+
+
+                });
+            }            
+        }
+        //  else if (filetype == "image/jpeg") {
+        //     if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/Images/${zipname}.jpg`)))
+        //     {
+        //         console.log("//=== File already exist =======//")
+        //         let timer = setTimeout(()=>{
+        //             pubnub.publish(
+        //                 {
+        //                     channel: masterChannel,
+        //                     message: {
+        //                         mac_id :  publishChannel,
+        //                         eventname : "Downloaded",
+        //                         status: "Image Already Exist",
+        //                         filename : zipname,
+        //                         filetype : "image/jpeg"
+        //                     },
+        //                 },
+        //                 (status, response) => {
+        //                     console.log("Status Pubnub ===> ", status);
+        //                 }
+        //             );
+        //             clearTimeout(timer)
+        //         },3000)
+        //         return ;
+        //     }
+            // else
+            // {
+            //     const file = fileurl;
+            //     console.log("Image file url ==> ", fileurl);
+            //     //const filePath = `${__dirname}/zippedfiles`;
+            //     const filePath = `${__dirname}/Saps_Rasp_Pubnub/src/Images`;
+            //     download(file, filePath).then(() => {
+            //         console.log("//==  Image Download Completed   ==//");
+            //         //===> Pubnub Publish of Download Completion ===>
+            //         pubnub.publish(
+            //             {
+            //                 channel: masterChannel,
+            //                 message: {
+            //                     mac_id :  publishChannel,
+            //                     eventname : "Downloaded",
+            //                     status: "Download Success",
+            //                     filename : zipname,
+            //                     filetype : "image/jpeg"
+            //                 },
+            //             },
+            //             (status, response) => {
+            //                 console.log("Status Pubnub ===> ", status);
+            //             }
+            //         );
+            //     });
+            // }
+        // }
+    }
+}
+
+
+
+
+
 const imageFolder = './Saps_Rasp_Pubnub/src/Images/';
 const videoFolder = './Saps_Rasp_Pubnub/src/Videos/';
+const burnarAdFolder = './Saps_Rasp_Pubnub/src/BurnerAd/';
 
 // function createdDate (fileFolder, file) {  
 //   const { birthtime } = fs.statSync(`${fileFolder}${file}`)
@@ -893,8 +1074,20 @@ async function getUserFilesName(filetype) {
     {
         await readFileNameAndTime (imageFolder, filetype)
     }
+    else if(filetype === "burnerad")
+    {
+        await readFileNameAndTime (burnarAdFolder, filetype)
+    }
 
 }
+
+
+async function getBurnerAdFileName(fileFolder)
+{
+    burnerad = await fs.promises.readdir(fileFolder)
+}
+
+getBurnerAdFileName(burnarAdFolder);
 
 
 
@@ -914,6 +1107,11 @@ function DeleteUserFiles(uniquefilename, filetype) {
                     ? path.join(
                         __dirname,
                         `/Saps_Rasp_Pubnub/src/Images/${uniquefilename}.jpg`
+                    )
+                    : filetype && filetype == "burnerad"
+                    ? path.join(
+                        __dirname,
+                        `/Saps_Rasp_Pubnub/src/BurnerAd/${uniquefilename}.mp4`
                     )
                     : null;
         console.log("path == >", path1);
@@ -1104,29 +1302,37 @@ parser.on("data", (data) => {
 
     if (data.includes("check_hang")) {
         blinkLED();
-        let timer = setInterval(blinkLED, 250);
-        setTimeout(() => {
-            endBlink();
-            clearInterval(timer);
-        }, 5000);
+        // let timer = setInterval(blinkLED, 250);
+        // setTimeout(() => {
+        //     endBlink();
+        //     clearInterval(timer);
+        // }, 5000);
 
-        const child = exec(
-            "ping -c 5 www.google.com",
-            function (error, stdout, stderr) {
-                if (error !== null) {
-                    console.log("Not available");
-                } else {
-                    console.log("Available");
-                }
+        // const child = exec(
+        //     "ping -c 5 www.google.com",
+        //     function (error, stdout, stderr) {
+        //         if (error !== null) {
+        //             console.log("Not available");
+        //         } else {
+        //             console.log("Available");
+        //         }
 
-                port.write("pi_ok", function (err) {
-                    if (err) {
-                        return console.log("Error on Write: ", err.message);
-                    }
-                    console.log("message written");
-                });
+        //         port.write("pi_ok", function (err) {
+        //             if (err) {
+        //                 return console.log("Error on Write: ", err.message);
+        //             }
+        //             console.log("message written");
+        //         });
+        //     }
+        // );
+
+
+        port.write("pi_ok", function (err) {
+            if (err) {
+                return console.log("Error on Write: ", err.message);
             }
-        );
+            console.log("message written");
+        });
     }
 
     if (data.includes("get_ip")) {
@@ -1256,6 +1462,20 @@ async function forceUpdater() {
                             console.log("Status Pubnub ===> ", status);
                         }
                     ); 
+
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id :  publishChannel,
+                                eventname : "updateresp",
+                                status : "started"
+                            },
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );    
              }
         clearTimeout(updateTimer);
         },25000)

@@ -125,7 +125,14 @@ function App() {
         //setFullscreenvideotag(message.filename);
       }
     } else if (message.eventname == "stop") {
-      if (message.displaytype == "fullscreen") {
+      if(message.filetype == "burnerad"){
+        console.log("file type burneraddddddddddddddddddddddd");
+        setVideoname(message.filename);
+        setDisplaytype(message.displaytype); //==> "fullscreen",  "quadrant"
+        setFullscreenvideostatus(true);
+        setFiletype(message.filetype);
+      }
+      else {
         setDisplaytype(null);
         setFullscreenvideostatus(false);
         setVideolink("");
@@ -348,6 +355,31 @@ function App() {
                                </div>{" "}
                              </>
                               )}
+
+                              {/* {----------For Burner Ad----------------} */}
+
+                              {filetype && filetype == "burnerad" && (
+                                <>
+                                {console.log("burned player")}
+                                  <video
+                                    style={{
+                                      objectFit: "contain",
+                                      minHeight: "100%",
+                                      minWidth: "100%",
+                                      height: "100%",
+                                      width: "100%",
+                                    }}
+                                    controls
+                                    loop
+                                    autoPlay
+                                    muted={true}
+                                    src={require(`./BurnerAd/${videoname}`)}
+                                    type="video/mp4"
+                                  ></video>
+                                </>
+                              )}    
+
+                            {/* {----------For Burner Ad----------------} */}                              
 
                               {/* <video
                           style={{
