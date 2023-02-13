@@ -403,6 +403,7 @@ function App() {
                           <>
                             <div
                               style={{
+                                objectFit: "contain",
                                 height: "100vh",
                                 width: "100%",
                                 color: "white",
@@ -416,13 +417,14 @@ function App() {
                             >
                               <img
                                 style={{
-                                  width: "1400px",
-                                  height: "400px",
-                                  marginBottom: "5px",
-                                  backgroundSize: "cover",
-                                  backgroundPosition: "center",
-                                  backgroundRepeat: "no-repeat",
-                                  borderRadius: "10px",
+                                  objectFit: "contain",
+                                    minHeight: "100%",
+                                    minWidth: "100%",
+                                    height: "100%",
+                                    width: "100%",
+                                    backgroundSize: "contain",
+                                    backgroundPosition: "center",
+                                    backgroundRepeat: "no-repeat",
                                 }}
                                 src={SapsPurple}
                               />
@@ -454,6 +456,7 @@ function App() {
                   <>
                     <div
                       style={{
+                        objectFit: "contain",
                         height: "100vh",
                         width: "100%",
                         color: "white",
@@ -467,13 +470,14 @@ function App() {
                     >
                       <img
                         style={{
-                          width: "1400px",
-                          height: "400px",
-                          marginBottom: "5px",
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                          backgroundRepeat: "no-repeat",
-                          borderRadius: "10px",
+                          objectFit: "contain",
+                                    minHeight: "100%",
+                                    minWidth: "100%",
+                                    height: "100%",
+                                    width: "100%",
+                                    backgroundSize: "contain",
+                                    backgroundPosition: "center",
+                                    backgroundRepeat: "no-repeat",
                         }}
                         src={SapsPurple}
                       />

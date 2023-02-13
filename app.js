@@ -122,6 +122,7 @@ function getChannel() {
         //let SkaiChannel = "c2thaVVwZGF0ZUNoYW5uZWw="
         //let postmyaddChannel = "cG9zdE15QWRkQ2hhbm5lbA=="
         a.push(postmyaddChannel)
+        a.push(masterChannel)
         pubnub.subscribe({
             channels: a,
         });
@@ -185,6 +186,31 @@ pubnub.addListener({
 }
 
         }
+
+        else if(messageEvent.channel == masterChannel)
+        {
+            if (messageEvent.message.eventname == "download_burner_ad") {
+                console.log("//===Downloading Burner ad Master Channel=========//")
+                DownloadBurnerAdZip(
+                    // ==> Download Function
+                    messageEvent.message.fileurl,
+                    messageEvent.message.uniquefilename,
+                    messageEvent.message.filetype
+                );
+            }
+
+            if (messageEvent.message.eventname == "delete_user_file") 
+            {
+                //console.log("Eventname => ", messageEvent.message.eventname);
+                DeleteUserFiles(
+                    messageEvent.message.uniquename,
+                    messageEvent.message.filetype
+                );
+            }
+        }
+
+
+
         else{
 
             if (messageEvent.message.eventname == "update") 
@@ -383,6 +409,7 @@ function PlayPauseVideo(data)
 //for google vision api------------------------------------------
 
     orderId = data.orderId;
+    second = data.second;
 
 
     if(data.eventname == "play")
@@ -418,6 +445,8 @@ function PlayPauseVideo(data)
                     message: {
                         mac_id :  publishChannel,
                         eventname : "playresp",
+                        orderId : orderId,
+                        second : second,
                         status : "played"
                     },
                 },
@@ -456,6 +485,8 @@ function PlayPauseVideo(data)
                     message: {
                         mac_id :  publishChannel,
                         eventname : "playresp",
+                        orderId : orderId,
+                        second : second,
                         status : "played"
                     },
                 },
@@ -492,6 +523,8 @@ function PlayPauseVideo(data)
                     message: {
                         mac_id :  publishChannel,
                         eventname : "playresp",
+                        orderId : orderId,
+                        second : second,
                         status : "played"
                     },
                 },
@@ -542,6 +575,8 @@ function PlayPauseVideo(data)
                 message: {
                     mac_id :  publishChannel,
                     eventname : "playresp",
+                    orderId : orderId,
+                    second : second,
                     status : "stopped"
                 },
             },
@@ -932,7 +967,7 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
                     console.log("path ==>", path);
     
                     fs.createReadStream(path).pipe(
-                        unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
+                        unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/BurnerAd" })
                     );
                     setTimeout(() => {
                         fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
