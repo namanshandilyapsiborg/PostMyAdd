@@ -1214,6 +1214,38 @@ async function frontendStart()
                                 {
                                     console.log("//========= F11 Command has been executed ====//")
                                     frontendstarted = true;
+                                    console.log("Burner ad list----->",burnerad.length);
+
+                                    let data;
+                                    
+                                    if (burnerad.length > 0)
+                                    {
+                                        const random = Math.floor(Math.random()*burnerad.length)
+                                
+                                        liveContentLink = null;
+                                        data["filetype"] = "burnerad";
+                                        data["filename"] = burnerad[random];
+                            
+                                    }
+                                    else{
+                                        data["filetype"] = null;
+                                        data["filename"] = null;  
+                                    }
+
+                                    if(frontendChannel)
+                                    {
+                                       pubnub.publish(
+                                           {
+                                               channel: frontendChannel,
+                                               message: data,
+                                           },
+                                           (status, response) => {
+                                               console.log("Status Pubnub ===> ", status);
+                                           }
+                                       );
+                                    }
+
+
                                 }
                                 clearTimeout(timer3)
                             },6000)
