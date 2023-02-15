@@ -677,7 +677,8 @@ async function click_photo(){
             // image = "<img src='" + data + "'>";
             if(err)
             {
-                console.log("Error From Click_photo", err);
+                // console.log("Error From Click_photo", err);
+                console.log("Error From Click_photo");
             }
             image = data;
             console.log("Quickstart after photo clicked ==>")
@@ -1042,6 +1043,7 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
                         },
                         (status, response) => {
                             console.log("Status Pubnub ===> ", status);
+                            getBurnerAdFileName(burnarAdFolder);
                         }
                     );
 
