@@ -1243,7 +1243,7 @@ async function frontendStart()
                                     
                                     if (burnerad.length > 0)
                                     {
-                                        let data;
+                                        let data = {};
                                         const random = Math.floor(Math.random()*burnerad.length)
                                 
                                         liveContentLink = null;
