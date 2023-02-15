@@ -35,6 +35,20 @@ let pubnub;
 
 var slot;
 
+let dir = null;
+
+if(!dir)
+{
+    dir = path.join(__dirname, "/Saps_Rasp_Pubnub/src/BurnerAd/")
+    if(!fs.existsSync(dir))
+    {
+        console.log("Creating Burner Ad Folder===")
+        fs.mkdirSync(dir)
+    }else{
+        console.log("===== BurnerAd Folder Already Exist=====")
+    }
+}
+
 
 
 var opts = {
@@ -634,9 +648,11 @@ async function sendPhotoToServer(orderId, photo){
             photo
         }
         let resp = await axios.post("http://api.postmyad.ai/api/order/orderViewsImage", body)
-        console.log("response from sendPhotoToServer====>", resp.data)
+        // console.log("response from sendPhotoToServer====>", resp.data)
+        console.log("response from sendPhotoToServer====>")
     }catch (error){
-        console.log("Error From sendPhotoToServer====>", error)
+        // console.log("Error From sendPhotoToServer====>", error)
+        console.log("response from sendPhotoToServer <<<<<<<<<<<<<<ERROR>>>>>>>>>>>>>>>>====>")
     }
 }
 
@@ -1109,7 +1125,8 @@ async function readFileNameAndTime (fileFolder, filetype) {
         }
 
         let resp = await axios.post("http://api.postmyad.ai/api/device/deviceGallery/deviceFiles", body)
-        console.log("response from sendPhotoToServer====>", resp.data)
+        // console.log("response from sendPhotoToServer====>", resp.data)
+        console.log("response from readFileNameAndTime====>")
 
         pubnub.publish(
             {
@@ -1216,34 +1233,34 @@ async function frontendStart()
                                     frontendstarted = true;
                                     console.log("Burner ad list----->",burnerad.length);
 
-                                    let data;
                                     
                                     if (burnerad.length > 0)
                                     {
+                                        let data;
                                         const random = Math.floor(Math.random()*burnerad.length)
                                 
                                         liveContentLink = null;
                                         data["filetype"] = "burnerad";
                                         data["filename"] = burnerad[random];
                             
+                                        if(frontendChannel)
+                                        {
+                                           pubnub.publish(
+                                               {
+                                                   channel: frontendChannel,
+                                                   message: data,
+                                               },
+                                               (status, response) => {
+                                                   console.log("Status Pubnub ===> ", status);
+                                               }
+                                           );
+                                        }
                                     }
-                                    else{
-                                        data["filetype"] = null;
-                                        data["filename"] = null;  
-                                    }
+                                    // else{
+                                    //     data["filetype"] = null;
+                                    //     data["filename"] = null;  
+                                    // }
 
-                                    if(frontendChannel)
-                                    {
-                                       pubnub.publish(
-                                           {
-                                               channel: frontendChannel,
-                                               message: data,
-                                           },
-                                           (status, response) => {
-                                               console.log("Status Pubnub ===> ", status);
-                                           }
-                                       );
-                                    }
 
 
                                 }
