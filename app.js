@@ -1,5 +1,6 @@
 console.log("//============= PostMyadd BAckend has been started ==============//")
-const { pubnub } = require("./pubnub-module");
+// const { pubnub } = require("./pubnub-module");
+const PubNub = require("pubnub");
 const download = require("download");
 const unzipper = require("unzipper");
 // const path = require("path");
@@ -29,6 +30,8 @@ var NodeWebcam = require( "node-webcam" );
 const moment = require('moment');
 
 // let time = moment();
+
+let pubnub;
 
 var slot;
 
@@ -115,6 +118,25 @@ function getChannel() {
         let data1 = fs.readFileSync("./frontendMac.json", "utf-8");
         let mcadd1 = JSON.parse(data1);
         console.log("Frontend MAC ===> ", mcadd1[0].macaddress);
+
+                // const uuid = PubNub.generateUUID();
+        
+                     pubnub = new PubNub({
+                    publishKey: "pub-c-90d5fa5c-df63-46c7-b5f2-2d6ad4efd775",
+                    subscribeKey: "sub-c-81c16c55-f391-4f72-8e57-2d9e052a360c",
+                  
+                    // publishKey: "pub-c-1a0b4b54-d0f4-4493-86d8-fc2d56a06f55",
+                    // subscribeKey: "sub-c-3df591b2-a923-460c-8078-2ab79fea5016",
+                    //uuid: uuid,
+                    restore: true,
+                    presenceTimeout: 20,
+                    autoNetworkDetection : true,
+                    userId: mcadd[0].macaddress,
+          
+                    withPresence : true
+                    //keepAlive : true,
+                  });
+
         //==================== Mac address to write to the device ======================//
         publishChannel = mcadd[0].macaddress
         frontendChannel = mcadd1[0].macaddress
@@ -126,6 +148,8 @@ function getChannel() {
         pubnub.subscribe({
             channels: a,
         });
+
+        
     }
 }
 
@@ -549,13 +573,22 @@ function PlayPauseVideo(data)
         console.log("Clearing timer for photo in stop function");
         clearInterval(timer);
 
-        console.log("Burner ad list----->",burnerad);
+        console.log("Burner ad list----->",burnerad.length);
 
-        const random = Math.floor(Math.random()*burnerad.length)
+        if (burnerad.length > 0)
+        {
+            const random = Math.floor(Math.random()*burnerad.length)
+    
+            liveContentLink = null;
+            data["filetype"] = "burnerad";
+            data["filename"] = burnerad[random];
 
-        liveContentLink = null;
-        data["filetype"] = "burnerad";
-        data["filename"] = burnerad[random];
+        }
+        else{
+            data["filetype"] = null;
+            data["filename"] = null;  
+        }
+
         if(frontendChannel)
         {
            pubnub.publish(
