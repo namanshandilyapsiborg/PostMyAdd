@@ -305,7 +305,7 @@ function App() {
                                     backgroundRepeat: "no-repeat",
                                   }}
                                   // src={SapsPurple}
-                                  src={require(`./Images/${imagename}.jpg`)}
+                                  src={require(`./images_ad/${imagename}.jpg`)}
                                 />
                               )}
 

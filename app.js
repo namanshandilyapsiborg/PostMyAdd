@@ -29,6 +29,11 @@ var NodeWebcam = require( "node-webcam" );
 // Import the Moment liberary for time
 const moment = require('moment');
 
+const packageJson = require("./package.json")
+
+const version = packageJson.version;
+console.log("versionnnnnnn", version);
+
 // let time = moment();
 
 let pubnub;
@@ -460,7 +465,7 @@ function PlayPauseVideo(data)
         if (data && data.filetype == "image/jpeg") 
         {
           console.log("Image name ==> ", data.filename);
-          if(fs.existsSync(path.join(__dirname ,`/Saps_Rasp_Pubnub/src/Images/${data.filename}.jpg` )))
+          if(fs.existsSync(path.join(__dirname ,`/Saps_Rasp_Pubnub/src/images_ad/${data.filename}.jpg` )))
           {
              console.log("//=== Yes Image exist ===//")
              if(frontendChannel)
@@ -911,7 +916,7 @@ function DownloadVideoZip(fileurl, zipname, filetype) {
                 });
             }            
         } else if (filetype == "image/jpeg") {
-            if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/Images/${zipname}.jpg`)))
+            if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/images_ad/${zipname}.jpg`)))
             {
                 console.log("//=== File already exist =======//")
                 let timer = setTimeout(()=>{
@@ -939,7 +944,7 @@ function DownloadVideoZip(fileurl, zipname, filetype) {
                 const file = fileurl;
                 console.log("Image file url ==> ", fileurl);
                 //const filePath = `${__dirname}/zippedfiles`;
-                const filePath = `${__dirname}/Saps_Rasp_Pubnub/src/Images`;
+                const filePath = `${__dirname}/Saps_Rasp_Pubnub/src/images_ad`;
                 download(file, filePath).then(() => {
                     console.log("//==  Image Download Completed   ==//");
                     //===> Pubnub Publish of Download Completion ===>
@@ -1045,7 +1050,7 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
             }            
         }
         //  else if (filetype == "image/jpeg") {
-        //     if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/Images/${zipname}.jpg`)))
+        //     if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/images_ad/${zipname}.jpg`)))
         //     {
         //         console.log("//=== File already exist =======//")
         //         let timer = setTimeout(()=>{
@@ -1073,7 +1078,7 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
             //     const file = fileurl;
             //     console.log("Image file url ==> ", fileurl);
             //     //const filePath = `${__dirname}/zippedfiles`;
-            //     const filePath = `${__dirname}/Saps_Rasp_Pubnub/src/Images`;
+            //     const filePath = `${__dirname}/Saps_Rasp_Pubnub/src/images_ad`;
             //     download(file, filePath).then(() => {
             //         console.log("//==  Image Download Completed   ==//");
             //         //===> Pubnub Publish of Download Completion ===>
@@ -1102,7 +1107,7 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
 
 
 
-const imageFolder = './Saps_Rasp_Pubnub/src/Images/';
+const imageFolder = './Saps_Rasp_Pubnub/src/images_ad/';
 const videoFolder = './Saps_Rasp_Pubnub/src/Videos/';
 const burnarAdFolder = './Saps_Rasp_Pubnub/src/BurnerAd/';
 
@@ -1191,7 +1196,7 @@ function DeleteUserFiles(uniquefilename, filetype) {
                 : filetype && filetype == "image/jpeg"
                     ? path.join(
                         __dirname,
-                        `/Saps_Rasp_Pubnub/src/Images/${uniquefilename}.jpg`
+                        `/Saps_Rasp_Pubnub/src/images_ad/${uniquefilename}.jpg`
                     )
                     : filetype && filetype == "burnerad"
                     ? path.join(
