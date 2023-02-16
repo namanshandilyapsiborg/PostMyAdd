@@ -40,6 +40,8 @@ let pubnub;
 
 var slot;
 
+var adPlaying = false;
+
 let dir = null;
 
 if(!dir)
@@ -78,6 +80,7 @@ var Webcam = NodeWebcam.create( opts );
 
 var update_screen = false;
 let timer = null;
+let timer_burnerad = null;
 var image;
 
 
@@ -457,8 +460,11 @@ function PlayPauseVideo(data)
 
     if(data.eventname == "play")
     {
+        adPlaying = true;
         console.log("Clearing timer for photo in play function");
         clearInterval(timer);
+        console.log("Clearing timer for BurnerAd in play function");
+        clearInterval(timer_burnerad);
 
         liveContentLink = data.contentLink
         fileType = data.filetype
@@ -589,8 +595,11 @@ function PlayPauseVideo(data)
     }
     else if(data.eventname == "stop")
     {
+        adPlaying = false;
         console.log("Clearing timer for photo in stop function");
         clearInterval(timer);
+        console.log("Clearing timer for BurnerAd in stop function");
+        clearInterval(timer_burnerad);
 
         console.log("Burner ad list----->",burnerad.length);
 
@@ -637,7 +646,7 @@ function PlayPauseVideo(data)
             }
         );
 
-        
+        timer_burnerad = setInterval(playBurnerAd, 30000);
     }
    
 }
@@ -1044,6 +1053,7 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
                         (status, response) => {
                             console.log("Status Pubnub ===> ", status);
                             getBurnerAdFileName(burnarAdFolder);
+                            
                         }
                     );
 
@@ -1182,6 +1192,57 @@ async function getBurnerAdFileName(fileFolder)
 getBurnerAdFileName(burnarAdFolder);
 
 
+function playBurnerAd()
+{
+    console.log("Burner ad list----->",burnerad.length);
+
+    let data = {};
+                                    
+    if (burnerad.length > 0)
+    {
+        const random = Math.floor(Math.random()*burnerad.length)
+
+        liveContentLink = null;
+        data["filetype"] = "burnerad";
+        data["filename"] = burnerad[random];
+        data["eventname"] = "stop";
+        data["displaytype"] = "fullscreen";
+
+        if(frontendChannel)
+        {
+           pubnub.publish(
+               {
+                   channel: frontendChannel,
+                   message: data,
+               },
+               (status, response) => {
+                   console.log("Status Pubnub ===> ", status);
+               }
+           );
+        }
+        else{
+            liveContentLink = null;
+            data["filetype"] = null;
+            data["filename"] = null;  
+            data["eventname"] = "stop";
+            data["displaytype"] = "fullscreen";
+
+            if(frontendChannel)
+            {
+               pubnub.publish(
+                   {
+                       channel: frontendChannel,
+                       message: data,
+                   },
+                   (status, response) => {
+                       console.log("Status Pubnub ===> ", status);
+                   }
+               );
+            }
+        }
+    }
+}
+
 
 //=================== Delete files ==========================//
 // Saps_Rasp_Pubnub/src/Videos
@@ -1211,6 +1272,12 @@ function DeleteUserFiles(uniquefilename, filetype) {
             console.log("yes path exist");
             fs.unlinkSync(path1, () => {
                 console.log("User File Has Been Deleted Successfully");
+
+                if(!adPlaying)
+                {
+                    playBurnerAd();
+                }
+
             });
         } else {
             console.log("path doesn't exist");
@@ -1237,7 +1304,12 @@ async function frontendStart()
                                 if(stdout)
                                 {
                                     console.log("//========= F11 Command has been executed ====//")
+                                    adPlaying = false;
                                     frontendstarted = true;
+
+                                    console.log("Clearing timer for BurnerAd in play function");
+                                    clearInterval(timer_burnerad);
+
                                     console.log("Burner ad list----->",burnerad.length);
 
                                     
@@ -1249,6 +1321,8 @@ async function frontendStart()
                                         liveContentLink = null;
                                         data["filetype"] = "burnerad";
                                         data["filename"] = burnerad[random];
+                                        data["eventname"] = "stop";
+                                        data["displaytype"] = "fullscreen";
                             
                                         if(frontendChannel)
                                         {
@@ -1262,6 +1336,7 @@ async function frontendStart()
                                                }
                                            );
                                         }
+                                        timer_burnerad = setInterval(playBurnerAd, 30000);
                                     }
                                     // else{
                                     //     data["filetype"] = null;
