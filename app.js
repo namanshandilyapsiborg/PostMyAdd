@@ -1258,12 +1258,12 @@ function DeleteUserFiles(uniquefilename, filetype) {
             filetype && filetype == "video/mp4"
                 ? path.join(
                     __dirname,
-                    `/Saps_Rasp_Pubnub/src/Videos/${uniquefilename}.mp4`
+                    `/Saps_Rasp_Pubnub/src/Videos/${uniquefilename}`
                 )
                 : filetype && filetype == "image/jpeg"
                     ? path.join(
                         __dirname,
-                        `/Saps_Rasp_Pubnub/src/images_ad/${uniquefilename}.jpg`
+                        `/Saps_Rasp_Pubnub/src/images_ad/${uniquefilename}`
                     )
                     : filetype && filetype == "burnerad"
                     ? path.join(
