@@ -1307,7 +1307,7 @@ async function frontendStart()
                                     adPlaying = false;
                                     frontendstarted = true;
 
-                                    console.log("Clearing timer for BurnerAd in play function");
+                                    console.log("Clearing timer for BurnerAd in F11 Function function");
                                     clearInterval(timer_burnerad);
 
                                     console.log("Burner ad list----->",burnerad.length);
@@ -1336,8 +1336,11 @@ async function frontendStart()
                                                }
                                            );
                                         }
-                                        timer_burnerad = setInterval(playBurnerAd, 30000);
+                                        
                                     }
+                                    console.log("Starting timer for BurnerAd in F11 Function function");
+
+                                    timer_burnerad = setInterval(playBurnerAd, 30000);
                                     // else{
                                     //     data["filetype"] = null;
                                     //     data["filename"] = null;  
