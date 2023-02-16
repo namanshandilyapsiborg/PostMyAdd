@@ -1198,50 +1198,53 @@ getBurnerAdFileName(burnarAdFolder);
 
 function playBurnerAd()
 {
-    console.log("Burner ad list----->",burnerad.length);
-
-    let data = {};
-                                    
-    if (burnerad.length > 0)
+    if(!update_screen)
     {
-        const random = Math.floor(Math.random()*burnerad.length)
+        console.log("Burner ad list----->",burnerad.length);
 
-        liveContentLink = null;
-        data["filetype"] = "burnerad";
-        data["filename"] = burnerad[random];
-        data["eventname"] = "stop";
-        data["displaytype"] = "fullscreen";
-
-        if(frontendChannel)
+        let data = {};
+                                        
+        if (burnerad.length > 0)
         {
-           pubnub.publish(
-               {
-                   channel: frontendChannel,
-                   message: data,
-               },
-               (status, response) => {
-                   console.log("Status Pubnub ===> ", status);
-               }
-           );
-        }
-        else{
+            const random = Math.floor(Math.random()*burnerad.length)
+
             liveContentLink = null;
-            data["filetype"] = null;
-            data["filename"] = null;  
+            data["filetype"] = "burnerad";
+            data["filename"] = burnerad[random];
             data["eventname"] = "stop";
             data["displaytype"] = "fullscreen";
 
             if(frontendChannel)
             {
-               pubnub.publish(
-                   {
-                       channel: frontendChannel,
-                       message: data,
-                   },
-                   (status, response) => {
-                       console.log("Status Pubnub ===> ", status);
-                   }
-               );
+            pubnub.publish(
+                {
+                    channel: frontendChannel,
+                    message: data,
+                },
+                (status, response) => {
+                    console.log("Status Pubnub ===> ", status);
+                }
+            );
+            }
+            else{
+                liveContentLink = null;
+                data["filetype"] = null;
+                data["filename"] = null;  
+                data["eventname"] = "stop";
+                data["displaytype"] = "fullscreen";
+
+                if(frontendChannel)
+                {
+                pubnub.publish(
+                    {
+                        channel: frontendChannel,
+                        message: data,
+                    },
+                    (status, response) => {
+                        console.log("Status Pubnub ===> ", status);
+                    }
+                );
+                }
             }
         }
     }
