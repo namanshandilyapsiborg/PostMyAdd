@@ -106,6 +106,11 @@ function App() {
     const message = event.message;
     console.log("event message ==> ", message);
     if (message.eventname == "play") {
+
+      setDisplaytype(message.displaytype); //==> "fullscreen",  "quadrant"
+      setFullscreenvideostatus(true);
+      setFiletype(message.filetype);
+
       if (message.displaytype == "fullscreen") {
         if (message.filetype == "image/jpeg") {
           console.log("Image name ==> ", message.filetype);
@@ -118,9 +123,7 @@ function App() {
           console.log("Video link ==> ", message.filetype);
           setVideoname(message.filename);
         }
-        setDisplaytype(message.displaytype); //==> "fullscreen",  "quadrant"
-        setFullscreenvideostatus(true);
-        setFiletype(message.filetype);
+
         //setFullscreenvideotag(message.videoname); //==> Beach_1080p , Hello
         //setFullscreenvideotag(message.filename);
       }
