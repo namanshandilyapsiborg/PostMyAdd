@@ -452,19 +452,17 @@ function PlayPauseVideo(data)
 {
     console.log("playPauseVideo func() ==> ", data)
 
-//for google vision api------------------------------------------
+    //for google vision api------------------------------------------
 
     orderId = data.orderId;
     second = data.second;
 
-
     if(data.eventname == "play")
     {
-        adPlaying = true;
         console.log("Clearing timer for photo in play function");
         clearInterval(timer);
-        // console.log("Clearing timer for BurnerAd in play function");
-        // clearInterval(timer_burnerad);
+        console.log("Clearing timer for BurnerAd in play function");
+        clearInterval(timer_burnerad);
 
         liveContentLink = data.contentLink
         fileType = data.filetype
@@ -487,7 +485,6 @@ function PlayPauseVideo(data)
                 );
              }
 
-
              pubnub.publish(
                 {
                     channel: masterChannel,
@@ -503,10 +500,12 @@ function PlayPauseVideo(data)
                     console.log("Status Pubnub ===> ", status);
                 }
             );
-            
-            // start timer to click photo
-            console.log("Starting timer for photo");
-            timer = setInterval(click_photo, 10000);            
+
+              // start timer to click photo
+              console.log("Starting timer for photo");
+              timer = setInterval(click_photo, 5000);          
+
+             
           }
         }
         if (data && data.filetype == "video/mp4") 
@@ -515,86 +514,6 @@ function PlayPauseVideo(data)
           if(fs.existsSync(path.join(__dirname ,`/Saps_Rasp_Pubnub/src/Videos/${data.filename}.mp4` )))
           {
              console.log("//=== Yes Video exist ===//")
-
-            let data_test = {};
-            liveContentLink = null;
-            data_test["filetype"] = null;
-            data_test["filename"] = null;
-            data_test["eventname"] = "play";
-            data_test["displaytype"] = "fullscreen"; 
-         // }
- 
-         if(frontendChannel)
-         {
-            pubnub.publish(
-                {
-                    channel: frontendChannel,
-                    message: data_test,
-                },
-                (status, response) => {
-                    console.log("Status Pubnub ===> ", status);
-                }
-            );
-         }
-
-         let timer3 = setTimeout(()=>{
-            
-            if(frontendChannel)
-            {
-               pubnub.publish(
-                   {
-                       channel: frontendChannel,
-                       message: data,
-                   },
-                   (status, response) => {
-                       console.log("Status Pubnub ===> ", status);
-                   }
-               );
-            }
-            console.log("Playing Video/mp4");
-              
-    
-        clearTimeout(timer3)
-    },500)
-
-
-            //  if(frontendChannel)
-            //  {
-            //     pubnub.publish(
-            //         {
-            //             channel: frontendChannel,
-            //             message: data,
-            //         },
-            //         (status, response) => {
-            //             console.log("Status Pubnub ===> ", status);
-            //         }
-            //     );
-            //  }
-
-             pubnub.publish(
-                {
-                    channel: masterChannel,
-                    message: {
-                        mac_id :  publishChannel,
-                        eventname : "playresp",
-                        orderId : orderId,
-                        second : second,
-                        status : "played"
-                    },
-                },
-                (status, response) => {
-                    console.log("Status Pubnub ===> ", status);
-                }
-            ); 
-            
-            // start timer to click photo
-            console.log("Starting timer for photo");
-            timer = setInterval(click_photo, 10000);            
-          }
-        }
-        if (data && data.filetype == "url") 
-        {
-          console.log("Video link ==> ", data.filename);
              if(frontendChannel)
              {
                 pubnub.publish(
@@ -625,42 +544,78 @@ function PlayPauseVideo(data)
                 }
             );
 
+              // start timer to click photo
+              console.log("Starting timer for photo");
+              timer = setInterval(click_photo, 5000);          
+
+          }
+        }
+        if (data && data.filetype == "url") 
+        {
+          console.log("Video link ==> ", data.filename);
+             if(frontendChannel)
+             {
+                pubnub.publish(
+                    {
+                        channel: frontendChannel,
+                        message: data,
+                    },
+                    (status, response) => {
+                        console.log("Status Pubnub ===> ", status);
+                    }
+                );
+             }
+
+             pubnub.publish(
+                {
+                    channel: masterChannel,
+                    message: {
+                        mac_id :  publishChannel,
+                        eventname : "playresp",
+                        orderId : orderId,
+                        second : second,
+                        status : "played"
+                    },
+                },
+                (status, response) => {
+                    console.log("Status Pubnub ===> ", status);
+                }
+            );
+                        
             // start timer to click photo
             console.log("Starting timer for photo");
-            timer = setInterval(click_photo, 10000);            
+            timer = setInterval(click_photo, 5000);
         }
 
-        // start timer to click photo
-
-        // timer = setInterval(click_photo, 5000);
-
-
+            // // start timer to click photo
+            // console.log("Starting timer for photo");
+            // timer = setInterval(click_photo, 5000);
     }
     else if(data.eventname == "stop")
     {
-        adPlaying = false;
         console.log("Clearing timer for photo in stop function");
         clearInterval(timer);
-        // console.log("Clearing timer for BurnerAd in stop function");
-        // clearInterval(timer_burnerad);
 
+        console.log("Clearing timer for BurnerAd in stop function");
+        clearInterval(timer_burnerad);
 
+        // getBurnerAdFileName(burnarAdFolder);
+        
+        console.log("Burner ad list----->",burnerad.length);
 
-        // console.log("Burner ad list----->",burnerad.length);
-
-        // if (burnerad.length > 0)
-        // {
-        //     const random = Math.floor(Math.random()*burnerad.length)
+        if (burnerad.length > 0)
+        {
+            const random = Math.floor(Math.random()*burnerad.length)
     
-        //     liveContentLink = null;
-        //     data["filetype"] = "burnerad";
-        //     data["filename"] = burnerad[random];
+            liveContentLink = null;
+            data["filetype"] = "burnerad";
+            data["filename"] = burnerad[random];
 
-        // }
-        // else{
+        }
+        else{
             data["filetype"] = null;
             data["filename"] = null;  
-        // }
+        }
 
         if(frontendChannel)
         {
@@ -674,45 +629,6 @@ function PlayPauseVideo(data)
                }
            );
         }
-
-        let timer3 = setTimeout(()=>{
-            
-            console.log("Burner ad list----->",burnerad.length);
-
-            
-            if (burnerad.length > 0)
-            {
-                let data = {};
-                const random = Math.floor(Math.random()*burnerad.length)
-        
-                liveContentLink = null;
-                data["filetype"] = "burnerad";
-                data["filename"] = burnerad[random];
-                data["eventname"] = "stop";
-                data["displaytype"] = "fullscreen";
-    
-                if(frontendChannel)
-                {
-                   pubnub.publish(
-                       {
-                           channel: frontendChannel,
-                           message: data,
-                       },
-                       (status, response) => {
-                           console.log("Status Pubnub ===> ", status);
-                       }
-                   );
-                }
-                
-            }
-            console.log("Starting timer for BurnerAd in F11 Function function");
-
-              
-    
-        clearTimeout(timer3)
-    },500)
-
-
 
         pubnub.publish(
             {
@@ -730,7 +646,11 @@ function PlayPauseVideo(data)
             }
         );
 
-        // timer_burnerad = setInterval(playBurnerAd, 30000);
+        // console.log("Clearing timer for photo");
+        // clearInterval(timer);
+
+        timer_burnerad = setInterval(playBurnerAd, 30000);
+
     }
    
 }
@@ -1391,8 +1311,8 @@ async function frontendStart()
                                     adPlaying = false;
                                     frontendstarted = true;
 
-                                    // console.log("Clearing timer for BurnerAd in F11 Function function");
-                                    // clearInterval(timer_burnerad);
+                                    console.log("Clearing timer for BurnerAd in F11 Function function");
+                                    clearInterval(timer_burnerad);
 
                                     console.log("Burner ad list----->",burnerad.length);
 
@@ -1424,7 +1344,7 @@ async function frontendStart()
                                     }
                                     console.log("Starting timer for BurnerAd in F11 Function function");
 
-                                    // timer_burnerad = setInterval(playBurnerAd, 30000);
+                                    timer_burnerad = setInterval(playBurnerAd, 30000);
                                     // else{
                                     //     data["filetype"] = null;
                                     //     data["filename"] = null;  
