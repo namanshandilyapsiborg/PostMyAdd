@@ -78,6 +78,7 @@ var opts = {
 
 var Webcam = NodeWebcam.create( opts );
 
+var burnerAdPlaying = false;
 var update_screen = false;
 let timer = null;
 let timer_burnerad = null;
@@ -459,6 +460,7 @@ function PlayPauseVideo(data)
 
     if(data.eventname == "play")
     {
+        burnerAdPlaying = false;
         console.log("Clearing timer for photo in play function");
         clearInterval(timer);
         console.log("Clearing timer for BurnerAd in play function");
@@ -605,6 +607,7 @@ function PlayPauseVideo(data)
 
         if (burnerad.length > 0)
         {
+            burnerAdPlaying = true;
             const random = Math.floor(Math.random()*burnerad.length)
     
             liveContentLink = null;
@@ -773,6 +776,9 @@ async function showUpdateScreen(eventname)
             console.log("Version Inside showUpdateScreen ===> ", versionChecker)
             if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) 
             {
+                console.log("Clearing timer for BurnerAd in F11 Function function");
+                clearInterval(timer_burnerad);
+
                 if(frontendChannel)
                 {
                    console.log("//=== yes frontend channel exist ===//")
@@ -994,6 +1000,9 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
 
         checkSpace();
 
+        console.log("Clearing timer for BurnerAd in play function");
+        clearInterval(timer_burnerad);
+
         //===> for video download ====>
         if (filetype == "video/mp4") {
             console.log(" //=== Video/mp4 ======//");
@@ -1057,6 +1066,7 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
                         (status, response) => {
                             console.log("Status Pubnub ===> ", status);
                             getBurnerAdFileName(burnarAdFolder);
+                            timer_burnerad = setInterval(playBurnerAd, 30000);
                             
                         }
                     );
@@ -1242,6 +1252,7 @@ function playBurnerAd()
                     },
                     (status, response) => {
                         console.log("Status Pubnub ===> ", status);
+                        burnerAdPlaying = true;
                     }
                 );
                 }
@@ -1255,6 +1266,31 @@ function playBurnerAd()
 // Saps_Rasp_Pubnub/src/Videos
 function DeleteUserFiles(uniquefilename, filetype) {
     console.log("//====== Delete user files ===== //");
+
+    if (filetype == "burnerad" && burnerAdPlaying)
+    {
+        const random = Math.floor(Math.random()*burnerad.length)
+                                
+        liveContentLink = null;
+        data["filetype"] = null;
+        data["filename"] = null;
+        data["eventname"] = "stop";
+        data["displaytype"] = "fullscreen";
+
+        if(frontendChannel)
+        {
+           pubnub.publish(
+               {
+                   channel: frontendChannel,
+                   message: data,
+               },
+               (status, response) => {
+                   console.log("Status Pubnub ===> ", status);
+               }
+           );
+        }
+    }
+
     if (filetype && uniquefilename) {
         console.log("Filetype => ", filetype, "uniquefilename => ", uniquefilename);
         let path1 =
@@ -1340,6 +1376,7 @@ async function frontendStart()
                                                },
                                                (status, response) => {
                                                    console.log("Status Pubnub ===> ", status);
+                                                   burnerAdPlaying = true;
                                                }
                                            );
                                         }
@@ -1648,6 +1685,9 @@ async function forceUpdater() {
         console.log("//=== Verisons are not same ===//")
         //updater.forceUpdate();
 
+        console.log("Clearing timer for BurnerAd in F11 Function function");
+        clearInterval(timer_burnerad);
+
         let updateStatus = await updater.autoUpdate();
 
         if(updateStatus)
@@ -1748,6 +1788,10 @@ async function autoUpdateTimer() {
  console.log("version Checker value ===> ", versionChecker)
  if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) {
      console.log("//=== Verisons are not same ===//")
+
+     console.log("Clearing timer for BurnerAd in F11 Function function");
+     clearInterval(timer_burnerad);
+
      updater.forceUpdate();
 
      let timer = setTimeout(() => {
