@@ -417,6 +417,7 @@ function checkWifiConnection () {
         console.log("======== Wifi connection is turned ON ==========")
         resolve(true)
     }
+    reject("already connected")
      });
     });
 }
@@ -429,7 +430,8 @@ setTimeout(async () => {
 }, 20000)
 
 }).catch((err) => {
-console.log("==== wifi is turned Off ==== ")
+    restart();
+    console.log("== connection done ==", err)
 })
 
 
