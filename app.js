@@ -398,6 +398,41 @@ async function adlistner() {
 adlistner();
 
 
+function checkWifiConnection () {
+
+    return new Promise((resolve, reject) => {
+     exec("iwconfig", (error, stdout, stderr) => {
+      if (error) {
+       console.warn(error);
+      
+    }
+    // console.log("checkwifi ==>", typeof stdout)
+    let myPattern = new RegExp('(\\w*' + "Not-Associated" + '\\w*)', 'gi')
+    let matches = stdout.match(myPattern)
+
+    if (matches) {
+        // console.log("my pattern does exist")
+        exec("sudo rfkill unblock wifi")
+        exec("sudo ifconfig wlan0 up")
+        console.log("======== Wifi connection is turned ON ==========")
+        resolve(true)
+    }
+     });
+    });
+}
+
+
+checkWifiConnection().then ((data) => {
+setTimeout(async () => {
+    restart();
+    console.log("== connection done ==", data)
+}, 20000)
+
+}).catch((err) => {
+console.log("==== wifi is turned Off ==== ")
+})
+
+
 async function restart() {
     if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json") ) {
 
@@ -407,7 +442,7 @@ async function restart() {
 
 }
 
-restart();
+// restart();
 
 function restartstatus()
 {
