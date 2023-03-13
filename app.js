@@ -130,8 +130,8 @@ let burnerad;
 let frontendstarted = false;
 
 //========================= Getting MAcID ======================//
-function getChannel() {
-    if (fs.existsSync("./realmacadd.json") && fs.existsSync("./frontendMac.json") ) {
+async function getChannel() {
+    if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json") ) {
         console.log("//=== macadress Channel exist ==//");
         let data = fs.readFileSync("./realmacadd.json", "utf-8");
         //console.log("MAC id inside mac address json file ==> ", JSON.parse(data));
@@ -179,115 +179,59 @@ function getChannel() {
 getChannel()
 
 //========================= PUBNUB LISTENER ====================//
-pubnub.addListener({
-    status: function (statusEvent) {
-        if (statusEvent.category === "PNNetworkDownCategory") {
-            console.log("PNNetworkDownCategory ===> ", statusEvent.category);
-            pubnub.reconnect()
-        }
-        if (statusEvent.category === "PNConnectedCategory") {
-            console.log("statusEvent ===> ", statusEvent.category);
-        } else {
-            console.log("//== Connection failed ===//");
-            // pubnub.reconnect();
-        }
-    },
-    category: function (e) {
-        console.log(e.category === "PNNetworkDownCategory");
-    },
-    message: function (messageEvent) {
-        console.log("Message From Pubnub ===> ",messageEvent.message);
-        //if(messageEvent.channel == "c2thaVVwZGF0ZUNoYW5uZWw=")
-        if(messageEvent.channel == postmyaddChannel)
-        {
-        //=====================================================================//
-        if (messageEvent.message.eventname == "update") {
-        forceUpdater()
-        }
-        if (messageEvent.message.eventname == "autoUpdateTimer") {
-            autoUpdateTimer()
-        }
-        if (messageEvent.message.eventname == "updateScreenEnabled") {
-            showUpdateScreen("updateScreenEnabled")
-            }
-        if (messageEvent.message.eventname == "updateScreenDisabled") {
-            showUpdateScreen("updateScreenDisabled")
-        }    
-        if (messageEvent.message.eventname == "force reboot") {
-            console.log("//=== Rebooting ForceFully =========//")
-            exec("sudo reboot")
-        }
-        if (messageEvent.message.eventname == "space available") {
-            console.log("//===Checking Disk Space =========//")
-            checkSpace();
-    }
 
-    if (messageEvent.message.eventname == "download_burner_ad") {
-        console.log("//===Downloading Burner ad=========//")
-        DownloadBurnerAdZip(
-            // ==> Download Function
-            messageEvent.message.fileurl,
-            messageEvent.message.uniquefilename,
-            messageEvent.message.filetype
-        );
-}
+async function adlistner() {
+    if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json") ) {
 
-        }
-
-        else if(messageEvent.channel == masterChannel)
-        {
-            if (messageEvent.message.eventname == "download_burner_ad") {
-                console.log("//===Downloading Burner ad Master Channel=========//")
-                DownloadBurnerAdZip(
-                    // ==> Download Function
-                    messageEvent.message.fileurl,
-                    messageEvent.message.uniquefilename,
-                    messageEvent.message.filetype
-                );
-            }
-
-            if (messageEvent.message.eventname == "delete_user_file") 
-            {
-                //console.log("Eventname => ", messageEvent.message.eventname);
-                DeleteUserFiles(
-                    messageEvent.message.uniquename,
-                    messageEvent.message.filetype
-                );
-            }
-        }
-
-
-
-        else{
-
-            if (messageEvent.message.eventname == "update") 
-            {
+        pubnub.addListener({
+            status: function (statusEvent) {
+                if (statusEvent.category === "PNNetworkDownCategory") {
+                    console.log("PNNetworkDownCategory ===> ", statusEvent.category);
+                    pubnub.reconnect()
+                }
+                if (statusEvent.category === "PNConnectedCategory") {
+                    console.log("statusEvent ===> ", statusEvent.category);
+                } else {
+                    console.log("//== Connection failed ===//");
+                    // pubnub.reconnect();
+                }
+            },
+            category: function (e) {
+                console.log(e.category === "PNNetworkDownCategory");
+            },
+            message: function (messageEvent) {
+                console.log("Message From Pubnub ===> ",messageEvent.message);
+                //if(messageEvent.channel == "c2thaVVwZGF0ZUNoYW5uZWw=")
+                if(messageEvent.channel == postmyaddChannel)
+                {
+                //=====================================================================//
+                if (messageEvent.message.eventname == "update") {
                 forceUpdater()
-            }
-            if (messageEvent.message.eventname == "autoUpdateTimer") 
-            {
-                autoUpdateTimer()
-            }
-            if (messageEvent.message.eventname == "updateScreenEnabled") 
-            {
-                showUpdateScreen("updateScreenEnabled")
-            }
-            if (messageEvent.message.eventname == "updateScreenDisabled") 
-            {
-                showUpdateScreen("updateScreenDisabled")
-            } 
+                }
 
+                if (messageEvent.message.eventname == "autoupdate") 
+                {
+                    autoUpdater()
+                }
 
-            if (messageEvent.message.eventname === "download_video") {
-                DownloadVideoZip(
-                    // ==> Download Function
-                    messageEvent.message.fileurl,
-                    messageEvent.message.uniquefilename,
-                    messageEvent.message.filetype
-                );
+                if (messageEvent.message.eventname == "autoUpdateTimer") {
+                    autoUpdateTimer()
+                }
+                if (messageEvent.message.eventname == "updateScreenEnabled") {
+                    showUpdateScreen("updateScreenEnabled")
+                    }
+                if (messageEvent.message.eventname == "updateScreenDisabled") {
+                    showUpdateScreen("updateScreenDisabled")
+                }    
+                if (messageEvent.message.eventname == "force reboot") {
+                    console.log("//=== Rebooting ForceFully =========//")
+                    exec("sudo reboot")
+                }
+                if (messageEvent.message.eventname == "space available") {
+                    console.log("//===Checking Disk Space =========//")
+                    checkSpace();
             }
-
-
+        
             if (messageEvent.message.eventname == "download_burner_ad") {
                 console.log("//===Downloading Burner ad=========//")
                 DownloadBurnerAdZip(
@@ -296,92 +240,174 @@ pubnub.addListener({
                     messageEvent.message.uniquefilename,
                     messageEvent.message.filetype
                 );
-            }
-
-            if (messageEvent.message.eventname == "delete_user_file") {
-                //console.log("Eventname => ", messageEvent.message.eventname);
-                DeleteUserFiles(
-                    messageEvent.message.uniquename,
-                    messageEvent.message.filetype
-                );
-            }
-
-
-            if (messageEvent.message.eventname == "get_device_file") 
-            {
-                //console.log("Eventname => ", messageEvent.message.eventname);
-                if(frontendstarted)
+        }
+        
+                }
+        
+                else if(messageEvent.channel == masterChannel)
                 {
-                    getUserFilesName(messageEvent.message.filetype);
-                }
-                else{
-                    pubnub.publish(
-                        {
-                            channel: masterChannel,
-                            message: {
-                                mac_id :  publishChannel,
-                                eventname : "resp_get_device_file",
-                                status: "Get Device File Failure",
-                            },
-                        },
-                        (status, response) => {
-                            console.log("Status Pubnub ===> ", status);
-                        }
-                    );
-                }
-                
-            } 
-
-            //============================= Play/Pause ===========================================//
-            if (messageEvent.message.eventname == "play") 
-            {
-                if(!update_screen)
-                {
-                    PlayPauseVideo(messageEvent.message)
-                }
-                
-            }   //=================== to stop the video =================>
-            if (messageEvent.message.eventname == "stop") {
-                if(!update_screen)
-                {
-                    PlayPauseVideo(messageEvent.message)
-                }
-                
-              }
-
-            if (messageEvent.message.eventname == "getlive") {
-                pubnub.publish(
-                    {
-                        channel: publishChannel,
-                        message: {
-                            mac_id :  publishChannel,
-                            eventname : "getlivelink",
-                            link : liveContentLink,
-                            fileType : fileType
-                        },
-                    },
-                    (status, response) => {
-                        console.log("Status Pubnub ===> ", status);
+                    if (messageEvent.message.eventname == "download_burner_ad") {
+                        console.log("//===Downloading Burner ad Master Channel=========//")
+                        DownloadBurnerAdZip(
+                            // ==> Download Function
+                            messageEvent.message.fileurl,
+                            messageEvent.message.uniquefilename,
+                            messageEvent.message.filetype
+                        );
                     }
-                );
-            }       
-           
-            if (messageEvent.message.eventname == "force reboot") {
-                console.log("//=== Rebooting ForceFully =========//")
-                exec("sudo reboot")
-            }
+        
+                    if (messageEvent.message.eventname == "delete_user_file") 
+                    {
+                        //console.log("Eventname => ", messageEvent.message.eventname);
+                        DeleteUserFiles(
+                            messageEvent.message.uniquename,
+                            messageEvent.message.filetype
+                        );
+                    }
+                }
+        
+        
+        
+                else{
+        
+                    if (messageEvent.message.eventname == "update") 
+                    {
+                        forceUpdater()
+                    }
+                    if (messageEvent.message.eventname == "autoUpdateTimer") 
+                    {
+                        autoUpdateTimer()
+                    }
+                    if (messageEvent.message.eventname == "updateScreenEnabled") 
+                    {
+                        showUpdateScreen("updateScreenEnabled")
+                    }
+                    if (messageEvent.message.eventname == "updateScreenDisabled") 
+                    {
+                        showUpdateScreen("updateScreenDisabled")
+                    } 
+        
+        
+                    if (messageEvent.message.eventname === "download_video") {
+                        DownloadVideoZip(
+                            // ==> Download Function
+                            messageEvent.message.fileurl,
+                            messageEvent.message.uniquefilename,
+                            messageEvent.message.filetype
+                        );
+                    }
+        
+        
+                    if (messageEvent.message.eventname == "download_burner_ad") {
+                        console.log("//===Downloading Burner ad=========//")
+                        DownloadBurnerAdZip(
+                            // ==> Download Function
+                            messageEvent.message.fileurl,
+                            messageEvent.message.uniquefilename,
+                            messageEvent.message.filetype
+                        );
+                    }
+        
+                    if (messageEvent.message.eventname == "delete_user_file") {
+                        //console.log("Eventname => ", messageEvent.message.eventname);
+                        DeleteUserFiles(
+                            messageEvent.message.uniquename,
+                            messageEvent.message.filetype
+                        );
+                    }
+        
+        
+                    if (messageEvent.message.eventname == "get_device_file") 
+                    {
+                        //console.log("Eventname => ", messageEvent.message.eventname);
+                        if(frontendstarted)
+                        {
+                            getUserFilesName(messageEvent.message.filetype);
+                        }
+                        else{
+                            pubnub.publish(
+                                {
+                                    channel: masterChannel,
+                                    message: {
+                                        mac_id :  publishChannel,
+                                        eventname : "resp_get_device_file",
+                                        status: "Get Device File Failure",
+                                    },
+                                },
+                                (status, response) => {
+                                    console.log("Status Pubnub ===> ", status);
+                                }
+                            );
+                        }
+                        
+                    } 
+        
+                    //============================= Play/Pause ===========================================//
+                    if (messageEvent.message.eventname == "play") 
+                    {
+                        if(!update_screen)
+                        {
+                            PlayPauseVideo(messageEvent.message)
+                        }
+                        
+                    }   //=================== to stop the video =================>
+                    if (messageEvent.message.eventname == "stop") {
+                        if(!update_screen)
+                        {
+                            PlayPauseVideo(messageEvent.message)
+                        }
+                        
+                      }
+        
+                    if (messageEvent.message.eventname == "getlive") {
+                        pubnub.publish(
+                            {
+                                channel: publishChannel,
+                                message: {
+                                    mac_id :  publishChannel,
+                                    eventname : "getlivelink",
+                                    link : liveContentLink,
+                                    fileType : fileType
+                                },
+                            },
+                            (status, response) => {
+                                console.log("Status Pubnub ===> ", status);
+                            }
+                        );
+                    }       
+                   
+                    if (messageEvent.message.eventname == "force reboot") {
+                        console.log("//=== Rebooting ForceFully =========//")
+                        exec("sudo reboot")
+                    }
+        
+                    if (messageEvent.message.eventname == "space available") {
+                        console.log("//===Checking Disk Space =========//")
+                        checkSpace();
+                }  
+                }  
+            },
+            presence: function (presenceEvent) {
+                console.log("Handle Presence ===> ", presenceEvent);
+            },
+        });
+    }
 
-            if (messageEvent.message.eventname == "space available") {
-                console.log("//===Checking Disk Space =========//")
-                checkSpace();
-        }  
-        }  
-    },
-    presence: function (presenceEvent) {
-        console.log("Handle Presence ===> ", presenceEvent);
-    },
-});
+}
 
+adlistner();
+
+
+async function restart() {
+    if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json") ) {
+
+        restartstatus();
+        checkSpace();
+    }
+
+}
+
+restart();
 
 function restartstatus()
 {
@@ -401,7 +427,7 @@ function restartstatus()
 }
 
 
-restartstatus();
+
 
 
 //=======> Checking DiskSpace=======>
@@ -444,7 +470,7 @@ function checkSpace()
 })
 }
 
-checkSpace();
+
 
 
 
@@ -1677,58 +1703,169 @@ parser.on("data", (data) => {
 
 
 //================================== Git Code Updater ========================================//
+// async function forceUpdater() {
+//     console.log("//========================== ForceUpdater func() =========================//")
+//     let versionChecker = await updater.compareVersions();
+//     console.log("version Checker value ===> ", versionChecker)
+//     if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) {
+//         console.log("//=== Verisons are not same ===//")
+//         //updater.forceUpdate();
+
+//         console.log("Clearing timer for BurnerAd in F11 Function function");
+//         clearInterval(timer_burnerad);
+
+//         let updateStatus = await updater.autoUpdate();
+
+//         if(updateStatus)
+//         {
+//              //======> For updating the Frontend Screen
+//            let updateTimer =  setTimeout(()=>{
+//             if(frontendChannel)
+//             {
+//                 let data = {
+//                     eventname : "play",
+//                     filename : "updating",
+//                     displaytype : "fullscreen",
+//                     filetype : "updating"
+//                 }
+//                 pubnub.publish(
+//                         {
+//                             channel: frontendChannel,
+//                             message: data,
+//                         },
+//                         (status, response) => {
+//                             console.log("Status Pubnub ===> ", status);
+//                         }
+//                     ); 
+
+//                     pubnub.publish(
+//                         {
+//                             channel: masterChannel,
+//                             message: {
+//                                 mac_id :  publishChannel,
+//                                 eventname : "updateresp",
+//                                 status : "started"
+//                             },
+//                         },
+//                         (status, response) => {
+//                             console.log("Status Pubnub ===> ", status);
+//                         }
+//                     );    
+//              }
+//         clearTimeout(updateTimer);
+//         },25000)
+            
+//             let timer = setTimeout(() => {
+//                 const child = spawn('npm i', {
+//                     stdio: 'inherit',
+//                     shell: true,
+//                     cwd: './'
+//                 })
+    
+//                 child.on('close', (code) => {               
+//                     console.log(`Backend Node modules ===>  ${code}`);
+//                 let child2 = spawn('npm i', {
+//                         stdio: 'inherit',
+//                         shell: true,
+//                         cwd: './Saps_Rasp_Pubnub'
+//                     })
+    
+//                 child2.on('close', (code)=>{
+//                     console.log("//==== Fronted Node Modules ===//")
+//                     execShellCommand().then(() => {
+//                         exec("pkill -f firefox")
+//                         setTimeout(()=>{
+//                             console.log("//=============== REBOOTING ================//")
+//                             exec("sudo reboot");
+//                         },50000)
+//                     });
+//                 })    
+//                 });
+//                 console.log("//====== Timer Completed =====//")
+//                 clearTimeout(timer)
+//             }, 5*60000)    ///===> timer for reboot ==>  5 min
+//         }
+//     }
+//     else if (versionChecker.upToDate == true) {
+//         console.log("//==== Version is UpDated ===//")
+//         return;
+//     }
+// }
+
+
+
+//================================== Git Code Updater ========================================//
 async function forceUpdater() {
     console.log("//========================== ForceUpdater func() =========================//")
-    let versionChecker = await updater.compareVersions();
-    console.log("version Checker value ===> ", versionChecker)
-    if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) {
+    // let versionChecker = await updater.compareVersions();
+    // console.log("version Checker value ===> ", versionChecker)
+    // if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) {
         console.log("//=== Verisons are not same ===//")
-        //updater.forceUpdate();
+
+        let data = {
+            eventname : "play",
+            filename : "updating",
+            displaytype : "fullscreen",
+            filetype : "updating"
+        }
+        pubnub.publish(
+                {
+                    channel: frontendChannel,
+                    message: data,
+                },
+                (status, response) => {
+                    console.log("Status Pubnub ===> ", status);
+                }
+            ); 
 
         console.log("Clearing timer for BurnerAd in F11 Function function");
         clearInterval(timer_burnerad);
 
-        let updateStatus = await updater.autoUpdate();
+        let updateStatus = updater.forceUpdate();
+
+        // let updateStatus = await updater.autoUpdate();
 
         if(updateStatus)
         {
-             //======> For updating the Frontend Screen
+            //======> For updating the Frontend Screen
            let updateTimer =  setTimeout(()=>{
-            if(frontendChannel)
-            {
-                let data = {
-                    eventname : "play",
-                    filename : "updating",
-                    displaytype : "fullscreen",
-                    filetype : "updating"
-                }
-                pubnub.publish(
-                        {
-                            channel: frontendChannel,
-                            message: data,
-                        },
-                        (status, response) => {
-                            console.log("Status Pubnub ===> ", status);
-                        }
-                    ); 
-
+                if(frontendChannel)
+                {
+                     let data = {
+                        eventname : "play",
+                        filename : "updating",
+                        displaytype : "fullscreen",
+                        filetype : "updating"
+                    }
                     pubnub.publish(
-                        {
-                            channel: masterChannel,
-                            message: {
-                                mac_id :  publishChannel,
-                                eventname : "updateresp",
-                                status : "started"
+                            {
+                                channel: frontendChannel,
+                                message: data,
                             },
-                        },
-                        (status, response) => {
-                            console.log("Status Pubnub ===> ", status);
-                        }
-                    );    
-             }
-        clearTimeout(updateTimer);
-        },25000)
+                            (status, response) => {
+                                console.log("Status Pubnub ===> ", status);
+                            }
+                        ); 
+
+                        pubnub.publish(
+                            {
+                                channel: masterChannel,
+                                message: {
+                                    mac_id :  publishChannel,
+                                    eventname : "updateresp",
+                                    status : "started"
+                                },
+                            },
+                            (status, response) => {
+                                console.log("Status Pubnub ===> ", status);
+                            }
+                        );    
+                 }
+            clearTimeout(updateTimer);
+            },25000)
+           
             
+
             let timer = setTimeout(() => {
                 const child = spawn('npm i', {
                     stdio: 'inherit',
@@ -1745,14 +1882,122 @@ async function forceUpdater() {
                     })
     
                 child2.on('close', (code)=>{
+                    
                     console.log("//==== Fronted Node Modules ===//")
+
                     execShellCommand().then(() => {
                         exec("pkill -f firefox")
                         setTimeout(()=>{
                             console.log("//=============== REBOOTING ================//")
                             exec("sudo reboot");
                         },50000)
-                    });
+                    });                    
+                    // exec("pkill -f firefox")
+                    // setTimeout(()=>{
+                    //     console.log("//=============== REBOOTING ================//")
+                    //     exec("sudo reboot");
+                    // },10000)
+                })    
+                });
+                console.log("//====== Timer Completed =====//")
+                clearTimeout(timer)
+            }, 5*60000)    ///===> timer for reboot ==>  5 min
+        }
+    // }
+    // else if (versionChecker.upToDate == true) {
+    //     console.log("//==== Version is UpDated ===//")
+    //     return;
+    // }
+}
+
+
+
+async function autoUpdater() {
+    console.log("//========================== ForceUpdater func() =========================//")
+    let versionChecker = await updater.compareVersions();
+    console.log("version Checker value ===> ", versionChecker)
+    if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) {
+        console.log("//=== Verisons are not same ===//")
+
+        console.log("Clearing timer for BurnerAd in F11 Function function");
+        clearInterval(timer_burnerad);
+
+        //updater.forceUpdate();
+
+        let updateStatus = await updater.autoUpdate();
+
+        if(updateStatus)
+        {
+            //======> For updating the Frontend Screen
+           let updateTimer =  setTimeout(()=>{
+                if(frontendChannel)
+                {
+                    let data = {
+                        eventname : "play",
+                        filename : "updating",
+                        displaytype : "fullscreen",
+                        filetype : "updating"
+                    }
+                    pubnub.publish(
+                            {
+                                channel: frontendChannel,
+                                message: data,
+                            },
+                            (status, response) => {
+                                console.log("Status Pubnub ===> ", status);
+                            }
+                        ); 
+
+                        pubnub.publish(
+                            {
+                                channel: masterChannel,
+                                message: {
+                                    mac_id :  publishChannel,
+                                    eventname : "updateresp",
+                                    status : "started"
+                                },
+                            },
+                            (status, response) => {
+                                console.log("Status Pubnub ===> ", status);
+                            }
+                        );    
+                 }
+            clearTimeout(updateTimer);
+            },25000)
+           
+            
+
+            let timer = setTimeout(() => {
+                const child = spawn('npm i', {
+                    stdio: 'inherit',
+                    shell: true,
+                    cwd: './'
+                })
+    
+                child.on('close', (code) => {               
+                    console.log(`Backend Node modules ===>  ${code}`);
+                let child2 = spawn('npm i', {
+                        stdio: 'inherit',
+                        shell: true,
+                        cwd: './Saps_Rasp_Pubnub'
+                    })
+    
+                child2.on('close', (code)=>{
+                    
+                    console.log("//==== Fronted Node Modules ===//")
+
+                    execShellCommand().then(() => {
+                        exec("pkill -f firefox")
+                        setTimeout(()=>{
+                            console.log("//=============== REBOOTING ================//")
+                            exec("sudo reboot");
+                        },50000)
+                    });                    
+                    // exec("pkill -f firefox")
+                    // setTimeout(()=>{
+                    //     console.log("//=============== REBOOTING ================//")
+                    //     exec("sudo reboot");
+                    // },10000)
                 })    
                 });
                 console.log("//====== Timer Completed =====//")
@@ -1765,6 +2010,8 @@ async function forceUpdater() {
         return;
     }
 }
+
+
 
 
 function execShellCommand() {
