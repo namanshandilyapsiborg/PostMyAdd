@@ -112,7 +112,8 @@ function App() {
     const message = event.message;
     console.log("event message ==> ", message);
     if (message.cameraEvent) {
-      setCameraC(message.webCam)
+      // console.log("cameraEvent ==> ", message);
+      setCameraC(message.webcam)
     }
     if (message.eventname == "play") {
 
@@ -125,6 +126,10 @@ function App() {
           console.log("Image name ==> ", message.filetype);
           setImagename(message.filename);
         } else if (message.filetype == "video/mp4") {
+          console.log("Video name ==> ", message.filetype);
+          setVideoname(message.filename);
+        }
+        else if (message.filetype == "video/webm") {
           console.log("Video name ==> ", message.filetype);
           setVideoname(message.filename);
         }
@@ -173,11 +178,14 @@ function App() {
   };
 
   return (
-    <div>
-      { cameraC ?
-        <img src={camera} style={{position: "absolute",top: "10px", right: "10px"}} /> :
-        <img src={nocamera} style={{position: "absolute",top: "10px", right: "10px"}} />
-      }
+    <div  style={{ display: "flex", width: "100%"}}>
+      <div style={{position: "absolute",top: "10px", right: "10px"}}>  
+        { cameraC ?
+          <img src={camera}  /> :
+          <img src={nocamera}  />
+        }
+      </div>  
+
       {
       online === false ? (
         <>
@@ -279,7 +287,7 @@ function App() {
                                 height: "100%",
                                 width: "100%",
                                 //backgroundColor : "red",
-                                position: "absolute",
+                                // position: "absolute",
                                 top: "0",
                                 left: "0",
                               }}
@@ -304,6 +312,31 @@ function App() {
                                     //src={"http://localhost:8000/videos/surfing_720p.mp4"}
                                     src={require(`./Videos/${videoname}.mp4`)}
                                     type="video/mp4"
+                                  ></video>
+                                </>
+                              )}
+
+
+                              {filetype && filetype == "video/webm" && videoname &&(
+                                <>
+                                  <video
+                                    style={{
+                                      // backgroundColor: "red",
+                                      objectFit: "contain",
+                                      minHeight: "100%",
+                                      minWidth: "100%",
+                                      height: "100%",
+                                      width: "100%",
+                                    }}
+                                    controls
+                                    loop
+                                    //value={vidRef}
+                                    autoPlay
+                                    muted={true}
+                                    //muted={false}
+                                    //src={"http://localhost:8000/videos/surfing_720p.mp4"}
+                                    src={require(`./Videos/${videoname}.webm`)}
+                                    type="video/webm"
                                   ></video>
                                 </>
                               )}

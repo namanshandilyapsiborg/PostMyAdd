@@ -77,12 +77,12 @@ var opts = {
 //Creates webcam instance
 
 var Webcam = NodeWebcam.create( opts );
-
+var cam = 14
 // get web cam list
 function countwebCamList(){
     Webcam.list(function(list){
-        console.log("============WEBCAM COUNT==========", list.length)
-        return list.length
+        // console.log("============WEBCAM COUNT==========", list.length)
+        cam = list.length
     })
 }
 
@@ -525,6 +525,7 @@ function checkSpace()
 function PlayPauseVideo(data)
 {
     console.log("playPauseVideo func() ==> ", data)
+    countwebCamList()
 
     //for google vision api------------------------------------------
 
@@ -627,6 +628,51 @@ function PlayPauseVideo(data)
 
           }
         }
+
+        if (data && data.filetype == "video/webm") 
+        {
+          console.log("Video name ==> ", data.filename);
+          if(fs.existsSync(path.join(__dirname ,`/Saps_Rasp_Pubnub/src/Videos/${data.filename}.webm` )))
+          {
+             console.log("//=== Yes Video exist ===//")
+             if(frontendChannel)
+             {
+                pubnub.publish(
+                    {
+                        channel: frontendChannel,
+                        message: data,
+                    },
+                    (status, response) => {
+                        console.log("Status Pubnub ===> ", status);
+                    }
+                );
+             }
+
+
+             pubnub.publish(
+                {
+                    channel: masterChannel,
+                    message: {
+                        mac_id :  publishChannel,
+                        eventname : "playresp",
+                        orderId : orderId,
+                        second : second,
+                        status : "played"
+                    },
+                },
+                (status, response) => {
+                    console.log("Status Pubnub ===> ", status);
+                }
+            );
+
+              // start timer to click photo
+              console.log("Starting timer for photo");
+              timer = setInterval(click_photo, 5000);          
+
+          }
+        }
+
+
         if (data && data.filetype == "url") 
         {
           console.log("Video link ==> ", data.filename);
@@ -670,6 +716,8 @@ function PlayPauseVideo(data)
     }
     else if(data.eventname == "stop")
     {
+        liveContentLink = null;
+
         console.log("Clearing timer for photo in stop function");
         clearInterval(timer);
 
@@ -1010,7 +1058,76 @@ function DownloadVideoZip(fileurl, zipname, filetype) {
 
                 });
             }            
-        } else if (filetype == "image/jpeg") {
+        } 
+        else if (filetype == "video/webm") {
+            console.log(" //=== Video/webm ======//");
+            //====> first check if video already downloaded
+            if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/Videos/${zipname}.webm`)))
+            {
+                console.log("//=== File already exist =======//")
+                //===> Pubnub Publish of Download Completion ===>
+                let timer = setTimeout(()=>{
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id :  publishChannel,
+                                eventname : "Downloaded",
+                                status : "Video Already Exist",
+                                filename : zipname,
+                                filetype : "video/webm"
+                            },
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
+                clearTimeout(timer)
+                },3000)
+                return ;
+            }
+            else 
+            {
+                const filePath = `${__dirname}/zippedfiles`;
+
+                download(file, filePath).then(() => {
+                    console.log("//==   Video Download Completed   ==//");
+    
+                    //============ Now unzip the file ==================//
+                    console.log("Inside Zip file name ==>", zipname);
+                    const path = `./zippedfiles/${zipname}.zip`;
+                    console.log("path ==>", path);
+    
+                    fs.createReadStream(path).pipe(
+                        unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
+                    );
+                    setTimeout(() => {
+                        fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
+                            console.log("deleted");
+                        });
+                    }, 1000);
+                    //===> Pubnub Publish of Download Completion ===>
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id :  publishChannel,
+                                eventname : "Downloaded",
+                                status : "Download Success",
+                                filename : zipname,
+                                filetype : "video/webm"
+                            },
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
+
+
+                });
+            }            
+        } 
+        else if (filetype == "image/jpeg") {
             if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/images_ad/${zipname}.jpg`)))
             {
                 console.log("//=== File already exist =======//")
@@ -1283,7 +1400,7 @@ getBurnerAdFileName(burnarAdFolder);
 
 function playBurnerAd()
 {
-    let cam = countwebCamList();
+    countwebCamList();
     console.log("return After Cam Count ===>", cam);
 
     if(!update_screen)
