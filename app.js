@@ -78,6 +78,16 @@ var opts = {
 
 var Webcam = NodeWebcam.create( opts );
 
+// get web cam list
+function countwebCamList(){
+    Webcam.list(function(list){
+        console.log("============WEBCAM COUNT==========", list.length)
+        return list.length
+    })
+}
+
+
+
 var burnerAdPlaying = false;
 var update_screen = false;
 let timer = null;
@@ -427,7 +437,7 @@ checkWifiConnection().then ((data) => {
 setTimeout(async () => {
     restart();
     console.log("== connection done ==", data)
-}, 20000)
+}, 50000)
 
 }).catch((err) => {
     restart();
@@ -531,6 +541,8 @@ function PlayPauseVideo(data)
 
         liveContentLink = data.contentLink
         fileType = data.filetype
+        data["webcam"] = cam === 14 ? false : true
+        data["cameraEvent"] = "camera"
         if (data && data.filetype == "image/jpeg") 
         {
           console.log("Image name ==> ", data.filename);
@@ -1271,11 +1283,17 @@ getBurnerAdFileName(burnarAdFolder);
 
 function playBurnerAd()
 {
+    let cam = countwebCamList();
+    console.log("return After Cam Count ===>", cam);
+
     if(!update_screen)
     {
         console.log("Burner ad list----->",burnerad.length);
 
         let data = {};
+
+        data["webcam"] = cam === 14 ? false : true
+        data["cameraEvent"] = "camera"
                                         
         if (burnerad.length > 0)
         {
@@ -1319,6 +1337,20 @@ function playBurnerAd()
                     }
                 );
                 }
+            }
+        }
+        else{
+            if(frontendChannel)
+            {
+            pubnub.publish(
+                {
+                    channel: frontendChannel,
+                    message: data,
+                },
+                (status, response) => {
+                    console.log("Status Pubnub ===> ", status);
+                }
+            );
             }
         }
     }
@@ -1457,12 +1489,12 @@ async function frontendStart()
 
                                 }
                                 clearTimeout(timer3)
-                            },6000)
+                            },20000)
                           
                         }
                             clearTimeout(timer2)
                             clearTimeout(masterTimer)
-                        }, 50000);
+                        }, 60000);
 
             // let timer2  = setTimeout(async() => {
             //                // exec("chromium-browser --app=http://www.localhost:3000/ --kiosk",(err,stdout , stderr)=>{
