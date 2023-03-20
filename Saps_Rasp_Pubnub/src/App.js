@@ -100,6 +100,7 @@ function App() {
           console.log("statusEvent ===> ", statusEvent.category);
         }else {
           console.log("//== Connection failed ===//");
+          pubnub.reconnect()
         }
         },
         message: handleMessage,
