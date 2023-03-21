@@ -292,6 +292,10 @@ async function adlistner() {
                     {
                         forceUpdater()
                     }
+                    if (messageEvent.message.eventname == "autoupdate") 
+                {
+                    autoUpdater()
+                }
                     if (messageEvent.message.eventname == "autoUpdateTimer") 
                     {
                         autoUpdateTimer()
