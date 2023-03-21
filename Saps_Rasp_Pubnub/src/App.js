@@ -31,6 +31,15 @@ const pubnub = new PubNub({
   restore: true,
   presenceTimeout: 20,
   autoNetworkDetection : true,
+
+  keepAliveSettings: {
+    keepAliveMsecs: 3600,
+    freeSocketKeepAliveTimeout: 3600,
+    timeout: 3600,
+    maxSockets: Infinity,
+    maxFreeSockets: 256 
+},
+
   userId: PubNub.generateUUID(),
   
 });
@@ -75,6 +84,9 @@ function App() {
   const [sensorval, setSensorval] = useState(true);
   const [playmode, setPlaymode] = useState(false);
   const [cameraC, setCameraC] = useState(false);
+
+  const [networkPubNub, setNetworkPubNub] = useState(false);
+
   const vidRef = useRef();
 
   useEffect(() => {
@@ -98,9 +110,15 @@ function App() {
         }
         if (statusEvent.category === "PNConnectedCategory") {
           console.log("statusEvent ===> ", statusEvent.category);
+          setFiletype("");
+          setNetworkPubNub(false);
         }else {
           console.log("//== Connection failed ===//");
-          pubnub.reconnect()
+          // pubnub.reconnect()
+          setDisplaytype("fullscreen"); //==> "fullscreen",  "quadrant"
+          setFullscreenvideostatus(true);
+          setFiletype("pubnubNetwork");
+          setNetworkPubNub(true);
         }
         },
         message: handleMessage,
@@ -299,11 +317,11 @@ function App() {
                                   <video
                                     style={{
                                       // backgroundColor: "red",
-                                      objectFit: "contain",
-                                      minHeight: "100%",
-                                      minWidth: "100%",
-                                      height: "100%",
-                                      width: "100%",
+                                      objectFit: "cover",
+                                      minHeight: "100vh",
+                                      minWidth: "100vh",
+                                      height: "100vh",
+                                      width: "100vh",
                                     }}
                                     controls
                                     loop
@@ -324,11 +342,11 @@ function App() {
                                   <video
                                     style={{
                                       // backgroundColor: "red",
-                                      objectFit: "contain",
-                                      minHeight: "100%",
-                                      minWidth: "100%",
-                                      height: "100%",
-                                      width: "100%",
+                                      objectFit: "cover",
+                                      minHeight: "100vh",
+                                      minWidth: "100vh",
+                                      height: "100vh",
+                                      width: "100vh",
                                     }}
                                     controls
                                     loop
@@ -414,11 +432,11 @@ function App() {
                                 {console.log("burned player")}
                                   <video
                                     style={{
-                                      objectFit: "contain",
-                                      minHeight: "100%",
-                                      minWidth: "100%",
-                                      height: "100%",
-                                      width: "100%",
+                                      objectFit: "cover",
+                                      minHeight: "100vh",
+                                      minWidth: "100vh",
+                                      height: "100vh",
+                                      width: "100vh",
                                     }}
                                     controls
                                     loop
@@ -431,6 +449,42 @@ function App() {
                               )}    
 
                             {/* {----------For Burner Ad----------------} */}                              
+
+
+                            {filetype && filetype == "pubnubNetwork" && networkPubNub &&(
+                                <>
+                                  <div
+                                  style={{
+                                    objectFit: "contain",
+                                    height: "100vh",
+                                    width: "100%",
+                                    color: "white",
+                                    backgroundColor: "black",
+                                    fontSize: "1.2rem",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                  }}
+                                  >
+                                <img
+                                  style={{
+                                    objectFit: "contain",
+                                    minHeight: "100%",
+                                    minWidth: "100%",
+                                    height: "100%",
+                                    width: "100%",
+                                    backgroundSize: "contain",
+                                    backgroundPosition: "center",
+                                    backgroundRepeat: "no-repeat",
+                                  }}
+                                  src={SapsPurple}
+                                />
+                                <h1>NETWORK DOWN </h1>
+                                </div>{" "}
+                                </>                          
+                                )}
+
 
                               {/* <video
                           style={{
