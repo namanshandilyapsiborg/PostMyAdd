@@ -433,10 +433,10 @@ function App() {
                                   <video
                                     style={{
                                       objectFit: "cover",
-                                      minHeight: "100vh",
-                                      minWidth: "100vh",
-                                      height: "100vh",
-                                      width: "100vh",
+                                      minHeight: "100%",
+                                      minWidth: "100%",
+                                      height: "100%",
+                                      width: "100%",
                                     }}
                                     controls
                                     loop
