@@ -209,7 +209,10 @@ async function adlistner() {
                 }
                 if (statusEvent.category === "PNConnectedCategory") {
                     console.log("statusEvent ===> ", statusEvent.category);
-                } else {
+                } 
+                if (statusEvent.category === "PNNetworkUpCategory") {
+                    console.log("statusEvent ===> ", statusEvent.category);
+                }else {
                     console.log("//== Connection failed ===//");
                     pubnub.reconnect();
                 }
