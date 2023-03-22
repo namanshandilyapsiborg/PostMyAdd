@@ -110,6 +110,12 @@ function App() {
         }
         if (statusEvent.category === "PNConnectedCategory") {
           console.log("statusEvent ===> ", statusEvent.category);
+          setDisplaytype(null);
+          setFullscreenvideostatus(false);
+          setVideolink("");
+          setImagename("");
+          setVideoname("");
+          //setFullscreenvideotag("");
           setFiletype("");
           setNetworkPubNub(false);
         }else {
@@ -457,7 +463,7 @@ function App() {
                                   style={{
                                     objectFit: "contain",
                                     height: "100vh",
-                                    width: "100%",
+                                    width: "100vw",
                                     color: "white",
                                     backgroundColor: "black",
                                     fontSize: "1.2rem",
@@ -470,10 +476,10 @@ function App() {
                                 <img
                                   style={{
                                     objectFit: "contain",
-                                    minHeight: "100%",
-                                    minWidth: "100%",
-                                    height: "100%",
-                                    width: "100%",
+                                    minHeight: "100vh",
+                                    minWidth: "100vw",
+                                    height: "100vh",
+                                    width: "100vw",
                                     backgroundSize: "contain",
                                     backgroundPosition: "center",
                                     backgroundRepeat: "no-repeat",
