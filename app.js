@@ -476,7 +476,8 @@ function restartstatus()
             message: {
                 mac_id :  publishChannel,
                 eventname : "devicerestart",
-                status : "restarted"
+                status : "restarted",
+                version : version
             },
         },
         (status, response) => {
@@ -519,7 +520,8 @@ function checkSpace()
                 mac_id :  publishChannel,
                 eventname : "diskSpace",
                 totalspace : totalSpace,
-                freespace : freeSpace
+                freespace : freeSpace,
+                version : version
             },
         },
         (status, response) => {
