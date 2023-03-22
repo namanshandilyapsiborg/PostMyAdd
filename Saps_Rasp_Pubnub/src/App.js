@@ -310,8 +310,8 @@ function App() {
                           <>
                             <div
                               style={{
-                                height: "100%",
-                                width: "100%",
+                                height: "100vh",
+                                width: "100vw",
                                 //backgroundColor : "red",
                                 // position: "absolute",
                                 top: "0",
@@ -322,12 +322,12 @@ function App() {
                                 <>
                                   <video
                                     style={{
-                                      // backgroundColor: "red",
-                                      objectFit: "cover",
+                                      backgroundColor: "black",
+                                      objectFit: "contain",
                                       minHeight: "100vh",
-                                      minWidth: "100vh",
+                                      minWidth: "100vw",
                                       height: "100vh",
-                                      width: "100vh",
+                                      width: "100vw",
                                     }}
                                     controls
                                     loop
@@ -347,12 +347,12 @@ function App() {
                                 <>
                                   <video
                                     style={{
-                                      // backgroundColor: "red",
-                                      objectFit: "cover",
+                                      backgroundColor: "black",
+                                      objectFit: "contain",
                                       minHeight: "100vh",
-                                      minWidth: "100vh",
+                                      minWidth: "100vw",
                                       height: "100vh",
-                                      width: "100vh",
+                                      width: "100vw",
                                     }}
                                     controls
                                     loop
