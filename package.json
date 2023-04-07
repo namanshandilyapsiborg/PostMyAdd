@@ -1,6 +1,6 @@
 {
   "name": "postmyadd",
-  "version": "1.0.5",
+  "version": "1.0.0",
   "description": "",
   "main": "Base64.js",
   "scripts": {
@@ -24,10 +24,12 @@
     "axios": "^1.2.1",
     "check-disk-space": "^3.3.1",
     "child_process": "^1.0.2",
+    "cors": "^2.8.5",
     "download": "^8.0.0",
-    "express": "^4.18.1",
+    "express": "^4.18.2",
     "fs": "^0.0.1-security",
     "moment": "^2.29.4",
+    "mqtt": "^4.3.7",
     "node-schedule": "^2.1.0",
     "node-webcam": "^0.8.1",
     "onoff": "^6.0.3",
@@ -35,6 +37,7 @@
     "qr-image": "^3.2.0",
     "rpi-wifi-connection": "^1.0.17",
     "serialport": "^10.4.0",
+    "socket.io": "^4.6.1",
     "unzipper": "^0.10.11"
   },
   "devDependencies": {

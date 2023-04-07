@@ -19,15 +19,25 @@ const { stdout, mainModule, stderr } = require("process");
 const schedule = require("node-schedule");
 const checkDiskSpace = require('check-disk-space').default
 
+const express = require("express")
+const cors = require("cors");
+const app = express()
+const httpServer = require('http').createServer(app);
+const socketio = require('socket.io');
 
 // Imports the Google Cloud client library
 const vision = require('@google-cloud/vision');
 
 // Import the Node_Webcam liberary
-var NodeWebcam = require( "node-webcam" );
+var NodeWebcam = require("node-webcam");
 
 // Import the Moment liberary for time
 const moment = require('moment');
+
+var { Base64 } = require("./Base64");
+
+const { ReadlineParser } = require("@serialport/parser-readline");
+const { clearInterval } = require("timers");
 
 const packageJson = require("./package.json")
 
@@ -36,27 +46,129 @@ console.log("versionnnnnnn", version);
 
 // let time = moment();
 
-let pubnub;
+//------------------------------------------- Socket.io--------------------------------------------//
 
-var slot;
+const server = new socketio.Server(httpServer, {
+    cors: {
+        origin: '*'
+    },
+    pingTimeout:60000,
+    pingInterval:25000
+});
+app.use(cors());
+server.on('connection', (client) => {
+    console.log("Connection to socket")
+    client.on('play', data => {
+        console.log("play =>", data)
+        orderId = data.orderId;
 
-var adPlaying = false;
+        console.log("Clearing timer for photo in play function");
+        clearInterval(timer);
+
+        // start timer to click photo
+        console.log("Starting timer for photo");
+        timer = setInterval(click_photo, 5000);
+    })
+    client.on('stop', data => {
+        console.log("stop =>", data)
+
+        console.log("Clearing timer for photo in play function");
+        clearInterval(timer);
+    })
+    client.send("message", "hello")
+    client.on("disconnect", () => {
+        console.log("disconnected")
+    })
+})
+
+httpServer.listen(8000, () => {
+    console.log("Server Running")
+})
+
+//-------------------------------------------------------------------------------------------------//
+
+//-------------------------------------------Necessary Folders-------------------------------------//
 
 let dir = null;
 
-if(!dir)
-{
-    dir = path.join(__dirname, "/Saps_Rasp_Pubnub/src/BurnerAd/")
-    if(!fs.existsSync(dir))
-    {
-        console.log("Creating Burner Ad Folder===")
-        fs.mkdirSync(dir)
-    }else{
-        console.log("===== BurnerAd Folder Already Exist=====")
+let dir_schedule = null;
+
+let dir_videos = null;
+
+let dir_images_ad = null;
+
+let dir_new_videos = null;
+
+let dir_new_images_ad = null;
+
+function createNecessaryFolders(){
+
+    if (!dir) {
+        dir = path.join(__dirname, "/Saps_Rasp_Pubnub/src/BurnerAd/")
+        if (!fs.existsSync(dir)) {
+            console.log("Creating Burner Ad Folder===")
+            fs.mkdirSync(dir)
+        } else {
+            console.log("===== BurnerAd Folder Already Exist=====")
+        }
+    }
+    
+    if (!dir_schedule) {
+        dir_schedule = path.join(__dirname, "./Saps_Rasp_Pubnub/src/schedule")
+        if (!fs.existsSync(dir_schedule)) {
+            console.log("Creating schedule Folder===")
+            fs.mkdirSync(dir_schedule)
+        } else {
+            console.log("===== schedule Folder Already Exist=====")
+        }
+    }
+    
+    if (!dir_videos) {
+        dir_videos = path.join(__dirname, "/Saps_Rasp_Pubnub/src/Videos")
+        if (!fs.existsSync(dir_videos)) {
+            console.log("Creating Videos Folder===")
+            fs.mkdirSync(dir_videos)
+        } else {
+            console.log("===== Videos Folder Already Exist=====")
+        }
+    }
+    
+    if (!dir_images_ad) {
+        dir_images_ad = path.join(__dirname, "/Saps_Rasp_Pubnub/src/images_ad")
+        if (!fs.existsSync(dir_images_ad)) {
+            console.log("Creating images_ad Folder===")
+            fs.mkdirSync(dir_images_ad)
+        } else {
+            console.log("===== images_ad Folder Already Exist=====")
+        }
+    }
+    
+    if (!dir_new_videos) {
+        dir_videos = path.join(__dirname, "/Saps_Rasp_Pubnub/src/NewVideos")
+        if (!fs.existsSync(dir_videos)) {
+            console.log("Creating NewVideosFolder===")
+            fs.mkdirSync(dir_videos)
+        } else {
+            console.log("===== NewVideos Folder Already Exist=====")
+        }
+    }
+    
+    if (!dir_new_images_ad) {
+        dir_new_images_ad = path.join(__dirname, "/Saps_Rasp_Pubnub/src/new_images_ad")
+        if (!fs.existsSync(dir_new_images_ad)) {
+            console.log("Creating new_images_ad Folder===")
+            fs.mkdirSync(dir_new_images_ad)
+        } else {
+            console.log("===== new_images_ad Folder Already Exist=====")
+        }
     }
 }
 
+createNecessaryFolders();
 
+//----------------------------------------------------------------------------//
+
+//----------------------------------- interface Webcam------------------------//
 
 var opts = {
 
@@ -76,17 +188,23 @@ var opts = {
 
 //Creates webcam instance
 
-var Webcam = NodeWebcam.create( opts );
+var Webcam = NodeWebcam.create(opts);
 var cam = 14
 // get web cam list
-function countwebCamList(){
-    Webcam.list(function(list){
+function countwebCamList() {
+    Webcam.list(function (list) {
         // console.log("============WEBCAM COUNT==========", list.length)
         cam = list.length
     })
 }
 
+//----------------------------------------------------------------------------------------------//
 
+let pubnub;
+
+var slot;
+
+var adPlaying = false;
 
 var burnerAdPlaying = false;
 var update_screen = false;
@@ -94,10 +212,24 @@ let timer = null;
 let timer_burnerad = null;
 var image;
 
+//---------------------------------PUBNUB Channels-------------------------------------------------//
 
 let masterChannel = "c3RvcmFnZS5zYXBzLm9uZQ=="           ///=====> For server Backend
 let postmyaddChannel = "cG9zdE15QWRkQ2hhbm5lbA=="        ///===> For PostMybAckend update channel
 
+let publishChannel;            //===> Device Original mac ID
+let frontendChannel;          //===> For only Frontend
+let a = [];
+
+//for live content
+let liveContentLink;
+let fileType;
+let burnerad;
+
+let frontendstarted = false;
+
+
+//-------------------------------OTA From GitHub Related Issue------------------------------------//
 
 const config = {
     repository: "https://github.com/namanshandilyapsiborg/PostMyAdd",
@@ -111,7 +243,7 @@ const config = {
 };
 const updater = new AutoGitUpdate(config);
 
-var { Base64 } = require("./Base64");
+//-----------------------------------------------------------------------------------------------//
 
 //====================== For Led =========================//
 var Gpio = require("onoff").Gpio; //include onoff to interact with the GPIO
@@ -121,27 +253,17 @@ var LED2 = new Gpio(26, "out"); //===> For QR Code LED GLOWING
 //====================== For Qr COde ===========================//
 const button = new Gpio(5, "in", "both");
 
-const { ReadlineParser } = require("@serialport/parser-readline");
-const { clearInterval } = require("timers");
+
 
 // let a = ["jNWN2kTOwITNmBDN"];
 // pubnub.subscribe({
 //   channels: a,
 // });
-let publishChannel;            //===> Device Original mac ID
-let frontendChannel ;          //===> For only Frontend
-let a = [];
 
-//for live content
-let liveContentLink;
-let fileType;
-let burnerad;
-
-let frontendstarted = false;
 
 //========================= Getting MAcID ======================//
 async function getChannel() {
-    if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json") ) {
+    if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json")) {
         console.log("//=== macadress Channel exist ==//");
         let data = fs.readFileSync("./realmacadd.json", "utf-8");
         //console.log("MAC id inside mac address json file ==> ", JSON.parse(data));
@@ -152,31 +274,33 @@ async function getChannel() {
         let mcadd1 = JSON.parse(data1);
         console.log("Frontend MAC ===> ", mcadd1[0].macaddress);
 
-                // const uuid = PubNub.generateUUID();
-        
-                     pubnub = new PubNub({
-                    publishKey: "pub-c-90d5fa5c-df63-46c7-b5f2-2d6ad4efd775",
-                    subscribeKey: "sub-c-81c16c55-f391-4f72-8e57-2d9e052a360c",
-                  
-                    // publishKey: "pub-c-1a0b4b54-d0f4-4493-86d8-fc2d56a06f55",
-                    // subscribeKey: "sub-c-3df591b2-a923-460c-8078-2ab79fea5016",
-                    //uuid: uuid,
-                    restore: true,
-                    presenceTimeout: 20,
-                    autoNetworkDetection : true,
-                    userId: mcadd[0].macaddress,
+        // const uuid = PubNub.generateUUID();
 
-                    keepAliveSettings: {
-                        keepAliveMsecs: 3600,
-                        freeSocketKeepAliveTimeout: 3600,
-                        timeout: 3600,
-                        maxSockets: Infinity,
-                        maxFreeSockets: 256 
-                    },
-          
-                    withPresence : true
-                    //keepAlive : true,
-                  });
+        pubnub = new PubNub({
+            publishKey: "pub-c-90d5fa5c-df63-46c7-b5f2-2d6ad4efd775",
+            subscribeKey: "sub-c-81c16c55-f391-4f72-8e57-2d9e052a360c",
+
+            // publishKey: "pub-c-1a0b4b54-d0f4-4493-86d8-fc2d56a06f55",
+            // subscribeKey: "sub-c-3df591b2-a923-460c-8078-2ab79fea5016",
+            //uuid: uuid,
+            restore: true,
+            presenceTimeout: 20,
+            autoNetworkDetection: true,
+            userId: mcadd[0].macaddress,
+
+            keepAliveSettings: {
+                keepAliveMsecs: 3600,
+                freeSocketKeepAliveTimeout: 3600,
+                timeout: 3600,
+                maxSockets: Infinity,
+                maxFreeSockets: 256
+            },
+
+            requestTimeout: 5*60000,
+
+            withPresence: true
+            //keepAlive : true,
+        });
 
         //==================== Mac address to write to the device ======================//
         publishChannel = mcadd[0].macaddress
@@ -190,7 +314,8 @@ async function getChannel() {
             channels: a,
         });
 
-        
+        // getScheduleJson();
+
     }
 }
 
@@ -199,7 +324,7 @@ getChannel()
 //========================= PUBNUB LISTENER ====================//
 
 async function adlistner() {
-    if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json") ) {
+    if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json")) {
 
         pubnub.addListener({
             status: function (statusEvent) {
@@ -209,120 +334,53 @@ async function adlistner() {
                 }
                 if (statusEvent.category === "PNConnectedCategory") {
                     console.log("statusEvent ===> ", statusEvent.category);
-                } 
+                }
                 if (statusEvent.category === "PNNetworkUpCategory") {
                     console.log("statusEvent ===> ", statusEvent.category);
-                }else {
+                } else {
                     console.log("//== Connection failed ===//");
-                    pubnub.reconnect();
+                    // pubnub.reconnect();
                 }
             },
             category: function (e) {
                 console.log(e.category === "PNNetworkDownCategory");
             },
             message: function (messageEvent) {
-                console.log("Message From Pubnub ===> ",messageEvent.message);
+                console.log("Message From Pubnub ===> ", messageEvent.message);
                 //if(messageEvent.channel == "c2thaVVwZGF0ZUNoYW5uZWw=")
-                if(messageEvent.channel == postmyaddChannel)
-                {
-                //=====================================================================//
-                if (messageEvent.message.eventname == "update") {
-                forceUpdater()
-                }
-
-                if (messageEvent.message.eventname == "autoupdate") 
-                {
-                    autoUpdater()
-                }
-
-                if (messageEvent.message.eventname == "autoUpdateTimer") {
-                    autoUpdateTimer()
-                }
-                if (messageEvent.message.eventname == "updateScreenEnabled") {
-                    showUpdateScreen("updateScreenEnabled")
-                    }
-                if (messageEvent.message.eventname == "updateScreenDisabled") {
-                    showUpdateScreen("updateScreenDisabled")
-                }    
-                if (messageEvent.message.eventname == "force reboot") {
-                    console.log("//=== Rebooting ForceFully =========//")
-                    exec("sudo reboot")
-                }
-                if (messageEvent.message.eventname == "space available") {
-                    console.log("//===Checking Disk Space =========//")
-                    checkSpace();
-            }
-        
-            if (messageEvent.message.eventname == "download_burner_ad") {
-                console.log("//===Downloading Burner ad=========//")
-                DownloadBurnerAdZip(
-                    // ==> Download Function
-                    messageEvent.message.fileurl,
-                    messageEvent.message.uniquefilename,
-                    messageEvent.message.filetype
-                );
-        }
-        
-                }
-        
-                else if(messageEvent.channel == masterChannel)
-                {
-                    if (messageEvent.message.eventname == "download_burner_ad") {
-                        console.log("//===Downloading Burner ad Master Channel=========//")
-                        DownloadBurnerAdZip(
-                            // ==> Download Function
-                            messageEvent.message.fileurl,
-                            messageEvent.message.uniquefilename,
-                            messageEvent.message.filetype
-                        );
-                    }
-        
-                    if (messageEvent.message.eventname == "delete_user_file") 
-                    {
-                        //console.log("Eventname => ", messageEvent.message.eventname);
-                        DeleteUserFiles(
-                            messageEvent.message.uniquename,
-                            messageEvent.message.filetype
-                        );
-                    }
-                }
-        
-        
-        
-                else{
-        
-                    if (messageEvent.message.eventname == "update") 
-                    {
+                if (messageEvent.channel == postmyaddChannel) {
+                    //=====================================================================//
+                    if (messageEvent.message.eventname == "update") {
                         forceUpdater()
                     }
-                    if (messageEvent.message.eventname == "autoupdate") 
-                {
-                    autoUpdater()
-                }
-                    if (messageEvent.message.eventname == "autoUpdateTimer") 
-                    {
+
+                    if (messageEvent.message.eventname == "autoupdate") {
+                        autoUpdater()
+                    }
+
+                    if (messageEvent.message.eventname == "autoUpdateTimer") {
                         autoUpdateTimer()
                     }
-                    if (messageEvent.message.eventname == "updateScreenEnabled") 
-                    {
+                    if (messageEvent.message.eventname == "updateScreenEnabled") {
                         showUpdateScreen("updateScreenEnabled")
                     }
-                    if (messageEvent.message.eventname == "updateScreenDisabled") 
-                    {
+                    if (messageEvent.message.eventname == "updateScreenDisabled") {
                         showUpdateScreen("updateScreenDisabled")
-                    } 
-        
-        
-                    if (messageEvent.message.eventname === "download_video") {
-                        DownloadVideoZip(
-                            // ==> Download Function
-                            messageEvent.message.fileurl,
-                            messageEvent.message.uniquefilename,
-                            messageEvent.message.filetype
-                        );
                     }
-        
-        
+                    if (messageEvent.message.eventname == "force reboot") {
+                        console.log("//=== Rebooting ForceFully =========//")
+                        exec("sudo reboot")
+                    }
+                    if (messageEvent.message.eventname == "space available") {
+                        console.log("//===Checking Disk Space =========//")
+                        checkSpace();
+                    }
+
+                    if (messageEvent.message.eventname == "delete_aftr_two_hr") {
+                        console.log("//=== delete_aftr_two_hr =========//")
+                        deleteFilesAftertwoHours(2 * 3600 * 1000);
+                    }
+
                     if (messageEvent.message.eventname == "download_burner_ad") {
                         console.log("//===Downloading Burner ad=========//")
                         DownloadBurnerAdZip(
@@ -332,7 +390,20 @@ async function adlistner() {
                             messageEvent.message.filetype
                         );
                     }
-        
+
+                }
+
+                else if (messageEvent.channel == masterChannel) {
+                    if (messageEvent.message.eventname == "download_burner_ad") {
+                        console.log("//===Downloading Burner ad Master Channel=========//")
+                        DownloadBurnerAdZip(
+                            // ==> Download Function
+                            messageEvent.message.fileurl,
+                            messageEvent.message.uniquefilename,
+                            messageEvent.message.filetype
+                        );
+                    }
+
                     if (messageEvent.message.eventname == "delete_user_file") {
                         //console.log("Eventname => ", messageEvent.message.eventname);
                         DeleteUserFiles(
@@ -340,81 +411,150 @@ async function adlistner() {
                             messageEvent.message.filetype
                         );
                     }
-        
-        
-                    if (messageEvent.message.eventname == "get_device_file") 
-                    {
+                }
+                else {
+
+                    if (messageEvent.message.eventname == "update") {
+                        forceUpdater()
+                    }
+                    if (messageEvent.message.eventname == "autoupdate") {
+                        autoUpdater()
+                    }
+                    if (messageEvent.message.eventname == "autoUpdateTimer") {
+                        autoUpdateTimer()
+                    }
+                    if (messageEvent.message.eventname == "updateScreenEnabled") {
+                        showUpdateScreen("updateScreenEnabled")
+                    }
+                    if (messageEvent.message.eventname == "updateScreenDisabled") {
+                        showUpdateScreen("updateScreenDisabled")
+                    }
+
+
+                    if (messageEvent.message.eventname === "download_video") {
+                        // DownloadVideoZip(
+                        //     // ==> Download Function
+                        //     messageEvent.message.fileurl,
+                        //     messageEvent.message.uniquefilename,
+                        //     messageEvent.message.filetype
+                        // );
+                    }
+
+
+                    if (messageEvent.message.eventname == "download_burner_ad") {
+                        console.log("//===Downloading Burner ad=========//")
+                        DownloadBurnerAdZip(
+                            // ==> Download Function
+                            messageEvent.message.fileurl,
+                            messageEvent.message.uniquefilename,
+                            messageEvent.message.filetype
+                        );
+                    }
+
+                    if (messageEvent.message.eventname == "delete_user_file") {
                         //console.log("Eventname => ", messageEvent.message.eventname);
-                        if(frontendstarted)
-                        {
+                        DeleteUserFiles(
+                            messageEvent.message.uniquename,
+                            messageEvent.message.filetype
+                        );
+                    }
+
+
+                    if (messageEvent.message.eventname == "get_device_file") {
+                        //console.log("Eventname => ", messageEvent.message.eventname);
+                        if (frontendstarted) {
                             getUserFilesName(messageEvent.message.filetype);
                         }
-                        else{
+                        else {
                             pubnub.publish(
                                 {
                                     channel: masterChannel,
                                     message: {
-                                        mac_id :  publishChannel,
-                                        eventname : "resp_get_device_file",
+                                        mac_id: publishChannel,
+                                        eventname: "resp_get_device_file",
                                         status: "Get Device File Failure",
                                     },
+                                    publishTimeout: 5*60000
                                 },
                                 (status, response) => {
                                     console.log("Status Pubnub ===> ", status);
                                 }
                             );
                         }
-                        
-                    } 
-        
+
+                    }
+
                     //============================= Play/Pause ===========================================//
-                    if (messageEvent.message.eventname == "play") 
-                    {
-                        if(!update_screen)
-                        {
-                            PlayPauseVideo(messageEvent.message)
+                    if (messageEvent.message.eventname == "play") {
+                        if (!update_screen) {
+                            // PlayPauseVideo(messageEvent.message)
                         }
-                        
+
                     }   //=================== to stop the video =================>
                     if (messageEvent.message.eventname == "stop") {
-                        if(!update_screen)
-                        {
-                            PlayPauseVideo(messageEvent.message)
+                        if (!update_screen) {
+                            // PlayPauseVideo(messageEvent.message)
                         }
-                        
-                      }
-        
+
+                    }
+
                     if (messageEvent.message.eventname == "getlive") {
                         pubnub.publish(
                             {
                                 channel: publishChannel,
                                 message: {
-                                    mac_id :  publishChannel,
-                                    eventname : "getlivelink",
-                                    link : liveContentLink,
-                                    fileType : fileType
+                                    mac_id: publishChannel,
+                                    eventname: "getlivelink",
+                                    link: liveContentLink,
+                                    fileType: fileType
                                 },
+                                publishTimeout: 5*60000
                             },
                             (status, response) => {
                                 console.log("Status Pubnub ===> ", status);
                             }
                         );
-                    }       
-                   
+                    }
+
                     if (messageEvent.message.eventname == "force reboot") {
                         console.log("//=== Rebooting ForceFully =========//")
                         exec("sudo reboot")
                     }
-        
+
                     if (messageEvent.message.eventname == "space available") {
                         console.log("//===Checking Disk Space =========//")
                         checkSpace();
-                }  
-                }  
+                    }
+                    if (messageEvent.message.eventname == "download_schedule_file") {
+                        console.log("//=== download_schedule_file =========//")
+                        getScheduleJson();
+
+                    }
+                    if (messageEvent.message.eventname == "delete_schedule_file") {
+                        console.log("//=== delete_schedule_file =========//")
+                        deleteScheduleJson();
+                        // deleteScheduleMedia();
+                        // moveContentFromNewLocationToOld();
+
+                    }
+                    if (messageEvent.message.eventname == "download_schedule_file_extra") {
+                        console.log("//=== delete_schedule_file =========//")
+                        // deleteScheduleJson();
+                        // deleteScheduleMedia();
+                        moveContentFromNewLocationToOld();
+
+                    }
+
+                    if (messageEvent.message.eventname == "restart_frontend") {
+                        console.log("//=== restart_frontend =========//")
+                        restartFrontend();
+                    }                    
+
+                }
             },
-            presence: function (presenceEvent) {
-                console.log("Handle Presence ===> ", presenceEvent);
-            },
+            // presence: function (presenceEvent) {
+            //     console.log("Handle Presence ===> ", presenceEvent);
+            // },
         });
     }
 
@@ -422,66 +562,98 @@ async function adlistner() {
 
 adlistner();
 
-
-function checkWifiConnection () {
+function checkWifiConnection() {
 
     return new Promise((resolve, reject) => {
-     exec("iwconfig", (error, stdout, stderr) => {
-      if (error) {
-       console.warn(error);
-      
-    }
-    // console.log("checkwifi ==>", typeof stdout)
-    let myPattern = new RegExp('(\\w*' + "Not-Associated" + '\\w*)', 'gi')
-    let matches = stdout.match(myPattern)
+        exec("iwconfig", (error, stdout, stderr) => {
+            if (error) {
+                console.warn(error);
 
-    if (matches) {
-        // console.log("my pattern does exist")
-        exec("sudo rfkill unblock wifi")
-        exec("sudo ifconfig wlan0 up")
-        console.log("======== Wifi connection is turned ON ==========")
-        resolve(true)
-    }
-    reject("already connected")
-     });
+            }
+            // console.log("checkwifi ==>", typeof stdout)
+            let myPattern = new RegExp('(\\w*' + "Not-Associated" + '\\w*)', 'gi')
+            let matches = stdout.match(myPattern)
+
+            if (matches) {
+                // console.log("my pattern does exist")
+                exec("sudo rfkill unblock wifi")
+                exec("sudo ifconfig wlan0 up")
+                console.log("======== Wifi connection is turned ON ==========")
+                resolve(true)
+            }
+            reject("already connected")
+        });
     });
 }
 
 
-checkWifiConnection().then ((data) => {
-setTimeout(async () => {
-    restart();
-    console.log("== connection done ==", data)
-}, 50000)
+checkWifiConnection().then((data) => {
+    setTimeout(async () => {
+
+        const child = exec(
+            "ping -c 5 www.google.com",
+            function (error, stdout, stderr) {
+                if (error !== null) {
+                    console.log("Internet Not available");
+                } else {
+                    console.log("Internet Available");
+                    restart();
+                }
+
+            }
+        );
+
+
+        console.log("== connection done ==", data)
+    }, 50000)
 
 }).catch((err) => {
-    restart();
+    const child = exec(
+        "ping -c 5 www.google.com",
+        function (error, stdout, stderr) {
+            if (error !== null) {
+                console.log("Internet Not available");
+            } else {
+                console.log("Internet Available");
+                restart();
+            }
+
+        }
+    );
     console.log("== connection done ==", err)
 })
 
 
 async function restart() {
-    if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json") ) {
+    if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json")) {
 
-        restartstatus();
-        checkSpace();
+        deleteScheduleJson();
+
+        let timer2 = setTimeout(async () => {
+            console.log("Deleting Old File 2 Hr Older Content-------->>>>>>>");
+            restartstatus();
+            checkSpace();
+            getScheduleJson();
+            clearTimeout(timer2);
+        }, 10000);
+
     }
 
 }
 
 // restart();
 
-function restartstatus()
-{
+function restartstatus() {
     pubnub.publish(
         {
             channel: masterChannel,
             message: {
-                mac_id :  publishChannel,
-                eventname : "devicerestart",
-                status : "restarted",
-                version : version
+                mac_id: publishChannel,
+                eventname: "devicerestart",
+                status: "restarted",
+                version: version
             },
+            publishTimeout: 5*60000
         },
         (status, response) => {
             console.log("Status Pubnub ===> ", status);
@@ -494,44 +666,40 @@ function restartstatus()
 
 
 //=======> Checking DiskSpace=======>
-function checkSpace()
-{
-// On Linux or macOS
+function checkSpace() {
+    // On Linux or macOS
     checkDiskSpace('/home').then((diskSpace) => {
-    console.log(diskSpace)
-    // {
-    //     diskPath: '/',
-    //     free: 12345678,
-    //     size: 98756432
-    // }
-    // Note: `free` and `size` are in bytes
+        console.log(diskSpace)
+       
+        // Note: `free` and `size` are in bytes
 
-    totalSpace = (diskSpace.size / 1024) / 1024 / 1024;
+        totalSpace = (diskSpace.size / 1024) / 1024 / 1024;
 
-    freeSpace = (diskSpace.free / 1024) / 1024 / 1024;
+        freeSpace = (diskSpace.free / 1024) / 1024 / 1024;
 
-    totalSpace = totalSpace.toFixed(3);
-    freeSpace = freeSpace.toFixed(3);
+        totalSpace = totalSpace.toFixed(3);
+        freeSpace = freeSpace.toFixed(3);
 
-    console.log("Total Space in gIGA bYT3",totalSpace);
-    console.log("Free Space in GB",freeSpace);
+        console.log("Total Space in gIGA bYT3", totalSpace);
+        console.log("Free Space in GB", freeSpace);
 
-    pubnub.publish(
-        {
-            channel: masterChannel,
-            message: {
-                mac_id :  publishChannel,
-                eventname : "diskSpace",
-                totalspace : totalSpace,
-                freespace : freeSpace,
-                version : version
+        pubnub.publish(
+            {
+                channel: masterChannel,
+                message: {
+                    mac_id: publishChannel,
+                    eventname: "diskSpace",
+                    totalspace: totalSpace,
+                    freespace: freeSpace,
+                    version: version
+                },
+                publishTimeout: 5*60000
             },
-        },
-        (status, response) => {
-            console.log("Status Pubnub ===> ", status);
-        }
-    );
-})
+            (status, response) => {
+                console.log("Status Pubnub ===> ", status);
+            }
+        );
+    })
 }
 
 
@@ -539,270 +707,259 @@ function checkSpace()
 
 
 //===> To play Pause 
-function PlayPauseVideo(data)
-{
-    console.log("playPauseVideo func() ==> ", data)
-    countwebCamList()
+// function PlayPauseVideo(data) {
+//     console.log("playPauseVideo func() ==> ", data)
+//     countwebCamList()
 
-    //for google vision api------------------------------------------
+//     //for google vision api------------------------------------------
 
-    orderId = data.orderId;
-    second = data.second;
+//     orderId = data.orderId;
+//     second = data.second;
 
-    if(data.eventname == "play")
-    {
-        burnerAdPlaying = false;
-        console.log("Clearing timer for photo in play function");
-        clearInterval(timer);
-        console.log("Clearing timer for BurnerAd in play function");
-        clearInterval(timer_burnerad);
+//     if (data.eventname == "play") {
+//         burnerAdPlaying = false;
+//         console.log("Clearing timer for photo in play function");
+//         clearInterval(timer);
+//         console.log("Clearing timer for BurnerAd in play function");
+//         clearInterval(timer_burnerad);
 
-        liveContentLink = data.contentLink
-        fileType = data.filetype
-        data["webcam"] = cam === 14 ? false : true
-        data["cameraEvent"] = "camera"
-        if (data && data.filetype == "image/jpeg") 
-        {
-          console.log("Image name ==> ", data.filename);
-          if(fs.existsSync(path.join(__dirname ,`/Saps_Rasp_Pubnub/src/images_ad/${data.filename}.jpg` )))
-          {
-             console.log("//=== Yes Image exist ===//")
-             if(frontendChannel)
-             {
-                pubnub.publish(
-                    {
-                        channel: frontendChannel,
-                        message: data,
-                    },
-                    (status, response) => {
-                        console.log("Status Pubnub ===> ", status);
-                    }
-                );
-             }
+//         liveContentLink = data.contentLink
+//         fileType = data.filetype
+//         data["webcam"] = cam === 14 ? false : true
+//         data["cameraEvent"] = "camera"
+//         if (data && data.filetype == "image/jpeg") {
+//             console.log("Image name ==> ", data.filename);
+//             if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/images_ad/${data.filename}.jpg`))) {
+//                 console.log("//=== Yes Image exist ===//")
+//                 if (frontendChannel) {
+//                     pubnub.publish(
+//                         {
+//                             channel: frontendChannel,
+//                             message: data,
+//                         },
+//                         (status, response) => {
+//                             console.log("Status Pubnub ===> ", status);
+//                         }
+//                     );
+//                 }
 
-             pubnub.publish(
-                {
-                    channel: masterChannel,
-                    message: {
-                        mac_id :  publishChannel,
-                        eventname : "playresp",
-                        orderId : orderId,
-                        second : second,
-                        status : "played"
-                    },
-                },
-                (status, response) => {
-                    console.log("Status Pubnub ===> ", status);
-                }
-            );
+//                 pubnub.publish(
+//                     {
+//                         channel: masterChannel,
+//                         message: {
+//                             mac_id: publishChannel,
+//                             eventname: "playresp",
+//                             orderId: orderId,
+//                             second: second,
+//                             status: "played"
+//                         },
+//                         publishTimeout: 5*60000
+//                     },
+//                     (status, response) => {
+//                         console.log("Status Pubnub ===> ", status);
+//                     }
+//                 );
 
-              // start timer to click photo
-              console.log("Starting timer for photo");
-              timer = setInterval(click_photo, 5000);          
-
-             
-          }
-        }
-        if (data && data.filetype == "video/mp4") 
-        {
-          console.log("Video name ==> ", data.filename);
-          if(fs.existsSync(path.join(__dirname ,`/Saps_Rasp_Pubnub/src/Videos/${data.filename}.mp4` )))
-          {
-             console.log("//=== Yes Video exist ===//")
-             if(frontendChannel)
-             {
-                pubnub.publish(
-                    {
-                        channel: frontendChannel,
-                        message: data,
-                    },
-                    (status, response) => {
-                        console.log("Status Pubnub ===> ", status);
-                    }
-                );
-             }
+//                 // start timer to click photo
+//                 console.log("Starting timer for photo");
+//                 timer = setInterval(click_photo, 5000);
 
 
-             pubnub.publish(
-                {
-                    channel: masterChannel,
-                    message: {
-                        mac_id :  publishChannel,
-                        eventname : "playresp",
-                        orderId : orderId,
-                        second : second,
-                        status : "played"
-                    },
-                },
-                (status, response) => {
-                    console.log("Status Pubnub ===> ", status);
-                }
-            );
-
-              // start timer to click photo
-              console.log("Starting timer for photo");
-              timer = setInterval(click_photo, 5000);          
-
-          }
-        }
-
-        if (data && data.filetype == "video/webm") 
-        {
-          console.log("Video name ==> ", data.filename);
-          if(fs.existsSync(path.join(__dirname ,`/Saps_Rasp_Pubnub/src/Videos/${data.filename}.webm` )))
-          {
-             console.log("//=== Yes Video exist ===//")
-             if(frontendChannel)
-             {
-                pubnub.publish(
-                    {
-                        channel: frontendChannel,
-                        message: data,
-                    },
-                    (status, response) => {
-                        console.log("Status Pubnub ===> ", status);
-                    }
-                );
-             }
+//             }
+//         }
+//         if (data && data.filetype == "video/mp4") {
+//             console.log("Video name ==> ", data.filename);
+//             if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/Videos/${data.filename}.mp4`))) {
+//                 console.log("//=== Yes Video exist ===//")
+//                 if (frontendChannel) {
+//                     pubnub.publish(
+//                         {
+//                             channel: frontendChannel,
+//                             message: data,
+//                         },
+//                         (status, response) => {
+//                             console.log("Status Pubnub ===> ", status);
+//                         }
+//                     );
+//                 }
 
 
-             pubnub.publish(
-                {
-                    channel: masterChannel,
-                    message: {
-                        mac_id :  publishChannel,
-                        eventname : "playresp",
-                        orderId : orderId,
-                        second : second,
-                        status : "played"
-                    },
-                },
-                (status, response) => {
-                    console.log("Status Pubnub ===> ", status);
-                }
-            );
+//                 pubnub.publish(
+//                     {
+//                         channel: masterChannel,
+//                         message: {
+//                             mac_id: publishChannel,
+//                             eventname: "playresp",
+//                             orderId: orderId,
+//                             second: second,
+//                             status: "played"
+//                         },
+//                         publishTimeout: 5*60000
+//                     },
+//                     (status, response) => {
+//                         console.log("Status Pubnub ===> ", status);
+//                     }
+//                 );
 
-              // start timer to click photo
-              console.log("Starting timer for photo");
-              timer = setInterval(click_photo, 5000);          
+//                 // start timer to click photo
+//                 console.log("Starting timer for photo");
+//                 timer = setInterval(click_photo, 5000);
 
-          }
-        }
+//             }
+//         }
+
+//         if (data && data.filetype == "video/webm") {
+//             console.log("Video name ==> ", data.filename);
+//             if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/Videos/${data.filename}.webm`))) {
+//                 console.log("//=== Yes Video exist ===//")
+//                 if (frontendChannel) {
+//                     pubnub.publish(
+//                         {
+//                             channel: frontendChannel,
+//                             message: data,
+//                         },
+//                         (status, response) => {
+//                             console.log("Status Pubnub ===> ", status);
+//                         }
+//                     );
+//                 }
 
 
-        if (data && data.filetype == "url") 
-        {
-          console.log("Video link ==> ", data.filename);
-             if(frontendChannel)
-             {
-                pubnub.publish(
-                    {
-                        channel: frontendChannel,
-                        message: data,
-                    },
-                    (status, response) => {
-                        console.log("Status Pubnub ===> ", status);
-                    }
-                );
-             }
+//                 pubnub.publish(
+//                     {
+//                         channel: masterChannel,
+//                         message: {
+//                             mac_id: publishChannel,
+//                             eventname: "playresp",
+//                             orderId: orderId,
+//                             second: second,
+//                             status: "played"
+//                         },
+//                         publishTimeout: 5*60000
+//                     },
+//                     (status, response) => {
+//                         console.log("Status Pubnub ===> ", status);
+//                     }
+//                 );
 
-             pubnub.publish(
-                {
-                    channel: masterChannel,
-                    message: {
-                        mac_id :  publishChannel,
-                        eventname : "playresp",
-                        orderId : orderId,
-                        second : second,
-                        status : "played"
-                    },
-                },
-                (status, response) => {
-                    console.log("Status Pubnub ===> ", status);
-                }
-            );
-                        
-            // start timer to click photo
-            console.log("Starting timer for photo");
-            timer = setInterval(click_photo, 5000);
-        }
+//                 // start timer to click photo
+//                 console.log("Starting timer for photo");
+//                 timer = setInterval(click_photo, 5000);
 
-            // // start timer to click photo
-            // console.log("Starting timer for photo");
-            // timer = setInterval(click_photo, 5000);
-    }
-    else if(data.eventname == "stop")
-    {
-        liveContentLink = null;
+//             }
+//         }
 
-        console.log("Clearing timer for photo in stop function");
-        clearInterval(timer);
 
-        console.log("Clearing timer for BurnerAd in stop function");
-        clearInterval(timer_burnerad);
+//         if (data && data.filetype == "url") {
+//             console.log("Video link ==> ", data.filename);
+//             if (frontendChannel) {
+//                 pubnub.publish(
+//                     {
+//                         channel: frontendChannel,
+//                         message: data,
+//                     },
+//                     (status, response) => {
+//                         console.log("Status Pubnub ===> ", status);
+//                     }
+//                 );
+//             }
 
-        // getBurnerAdFileName(burnarAdFolder);
-        
-        console.log("Burner ad list----->",burnerad.length);
+//             pubnub.publish(
+//                 {
+//                     channel: masterChannel,
+//                     message: {
+//                         mac_id: publishChannel,
+//                         eventname: "playresp",
+//                         orderId: orderId,
+//                         second: second,
+//                         status: "played"
+//                     },
+//                     publishTimeout: 5*60000
+//                 },
+//                 (status, response) => {
+//                     console.log("Status Pubnub ===> ", status);
+//                 }
+//             );
 
-        if (burnerad.length > 0)
-        {
-            burnerAdPlaying = true;
-            const random = Math.floor(Math.random()*burnerad.length)
-    
-            liveContentLink = null;
-            data["filetype"] = "burnerad";
-            data["filename"] = burnerad[random];
+//             // start timer to click photo
+//             console.log("Starting timer for photo");
+//             timer = setInterval(click_photo, 5000);
+//         }
 
-        }
-        else{
-            data["filetype"] = null;
-            data["filename"] = null;  
-        }
+//         // // start timer to click photo
+//         // console.log("Starting timer for photo");
+//         // timer = setInterval(click_photo, 5000);
+//     }
+//     else if (data.eventname == "stop") {
+//         liveContentLink = null;
 
-        if(frontendChannel)
-        {
-           pubnub.publish(
-               {
-                   channel: frontendChannel,
-                   message: data,
-               },
-               (status, response) => {
-                   console.log("Status Pubnub ===> ", status);
-               }
-           );
-        }
+//         console.log("Clearing timer for photo in stop function");
+//         clearInterval(timer);
 
-        pubnub.publish(
-            {
-                channel: masterChannel,
-                message: {
-                    mac_id :  publishChannel,
-                    eventname : "playresp",
-                    orderId : orderId,
-                    second : second,
-                    status : "stopped"
-                },
-            },
-            (status, response) => {
-                console.log("Status Pubnub ===> ", status);
-            }
-        );
+//         console.log("Clearing timer for BurnerAd in stop function");
+//         clearInterval(timer_burnerad);
 
-        // console.log("Clearing timer for photo");
-        // clearInterval(timer);
+//         // getBurnerAdFileName(burnarAdFolder);
 
-        timer_burnerad = setInterval(playBurnerAd, 30000);
+//         console.log("Burner ad list----->", burnerad.length);
 
-    }
-   
-}
+//         if (burnerad.length > 0) {
+//             burnerAdPlaying = true;
+//             const random = Math.floor(Math.random() * burnerad.length)
+
+//             liveContentLink = null;
+//             data["filetype"] = "burnerad";
+//             data["filename"] = burnerad[random];
+
+//         }
+//         else {
+//             data["filetype"] = null;
+//             data["filename"] = null;
+//         }
+
+//         if (frontendChannel) {
+//             pubnub.publish(
+//                 {
+//                     channel: frontendChannel,
+//                     message: data,
+//                 },
+//                 (status, response) => {
+//                     console.log("Status Pubnub ===> ", status);
+//                 }
+//             );
+//         }
+
+//         pubnub.publish(
+//             {
+//                 channel: masterChannel,
+//                 message: {
+//                     mac_id: publishChannel,
+//                     eventname: "playresp",
+//                     orderId: orderId,
+//                     second: second,
+//                     status: "stopped"
+//                 },
+//                 publishTimeout: 5*60000
+//             },
+//             (status, response) => {
+//                 console.log("Status Pubnub ===> ", status);
+//             }
+//         );
+
+//         // console.log("Clearing timer for photo");
+//         // clearInterval(timer);
+
+//         timer_burnerad = setInterval(getBurnerAd, 30000);  //getBurnerAd(); playBurnerAd
+
+//     }
+
+// }
 
 
 // let timer = setInterval(click_photo, 5000);
 
-async function sendPhotoToServer(orderId, photo){
-    try{
+async function sendPhotoToServer(orderId, photo) {
+    try {
         let body = {
             orderId,
             publishChannel,
@@ -811,7 +968,7 @@ async function sendPhotoToServer(orderId, photo){
         let resp = await axios.post("http://api.postmyad.ai/api/order/orderViewsImage", body)
         // console.log("response from sendPhotoToServer====>", resp.data)
         console.log("response from sendPhotoToServer====>")
-    }catch (error){
+    } catch (error) {
         // console.log("Error From sendPhotoToServer====>", error)
         console.log("response from sendPhotoToServer <<<<<<<<<<<<<<ERROR>>>>>>>>>>>>>>>>====>")
     }
@@ -828,174 +985,174 @@ async function sendPhotoToServer(orderId, photo){
 // });
 
 
-async function click_photo(){
-        await NodeWebcam.capture( `./images/photo.jpg`, opts, function( err, data ) {
-            // image = "<img src='" + data + "'>";
-            if(err)
-            {
-                // console.log("Error From Click_photo", err);
-                console.log("Error From Click_photo");
-            }
-            image = data;
-            console.log("Quickstart after photo clicked ==>")
+async function click_photo() {
+    await NodeWebcam.capture(`./images/photo.jpg`, opts, function (err, data) {
+        // image = "<img src='" + data + "'>";
+        if (err) {
+            // console.log("Error From Click_photo", err);
+            console.log("Error From Click_photo");
+        }
+        image = data;
+        console.log("Quickstart after photo clicked ==>");
 
-            sendPhotoToServer(orderId, image)
-            // quickstart();
-    
+        sendPhotoToServer(orderId, image);
+
     });
 }
 
-Webcam.clear();
+// Webcam.clear();
 
 //------------------Google Vision---------------------------------//
 
-async function quickstart() {
+// async function quickstart() {
 
-    let time = moment();
+//     let time = moment();
 
-    slot = time.format('H');
+//     slot = time.format('H');
 
-    console.log(
-    "Today is:",slot
-    );
+//     console.log(
+//         "Today is:", slot
+//     );
 
-    // Creates a client
-    const client = new vision.ImageAnnotatorClient({
-        keyFilename: "visionKey2.json"
-    });
-  
-    // // Performs label detection on the9 image file
-    // const [result] = await client.faceDetection('./images/photo.jpg');
+//     // Creates a client
+//     const client = new vision.ImageAnnotatorClient({
+//         keyFilename: "visionKey2.json"
+//     });
 
-    const [result] = await client.faceDetection({
-        image: { 
-          source: { filename: './images/photo.jpg' } 
-        },
-        features: [
-          {
-            maxResults: 2000,
-            type: vision.protos.google.cloud.vision.v1.Feature.Type.FACE_DETECTION,
-            // type: "FACE_DETECTION",
-          },
-        ],
-      });
+//     // // Performs label detection on the9 image file
+//     // const [result] = await client.faceDetection('./images/photo.jpg');
+
+//     const [result] = await client.faceDetection({
+//         image: {
+//             source: { filename: './images/photo.jpg' }
+//         },
+//         features: [
+//             {
+//                 maxResults: 2000,
+//                 type: vision.protos.google.cloud.vision.v1.Feature.Type.FACE_DETECTION,
+//                 // type: "FACE_DETECTION",
+//             },
+//         ],
+//     });
 
 
-    const faces = result.faceAnnotations;
-    faceCount = faces.length;
-    console.log('Faces ==>:', faceCount);
+//     const faces = result.faceAnnotations;
+//     faceCount = faces.length;
+//     console.log('Faces ==>:', faceCount);
 
-    pubnub.publish(
-        {
-            channel: masterChannel,
-            message: {
-                mac_id :  publishChannel,
-                eventname : "faceCount",
-                orderId : orderId,
-                faceCount : faceCount,
-                timeSlot : slot
-            },
-        },
-        (status, response) => {
-            console.log("Status Pubnub ===> ", status);
-        }
-        );
+//     pubnub.publish(
+//         {
+//             channel: masterChannel,
+//             message: {
+//                 mac_id: publishChannel,
+//                 eventname: "faceCount",
+//                 orderId: orderId,
+//                 faceCount: faceCount,
+//                 timeSlot: slot
+//             },
+//             publishTimeout: 5*60000
+//         },
+//         (status, response) => {
+//             console.log("Status Pubnub ===> ", status);
+//         }
+//     );
 
-        sendPhotoToServer(orderId, image)
-  }
+//     sendPhotoToServer(orderId, image)
+// }
 //   quickstart();
- 
 
 
-async function showUpdateScreen(eventname)
-{
-    try{
-        if(eventname && eventname == "updateScreenEnabled") 
-        {
+
+async function showUpdateScreen(eventname) {
+    try {
+        if (eventname && eventname == "updateScreenEnabled") {
             let versionChecker = await updater.compareVersions();
             console.log("Version Inside showUpdateScreen ===> ", versionChecker)
-            if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) 
-            {
+            if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) {
                 console.log("Clearing timer for BurnerAd in F11 Function function");
                 clearInterval(timer_burnerad);
 
-                if(frontendChannel)
-                {
-                   console.log("//=== yes frontend channel exist ===//")
-                   let data = {
-                       eventname : "play",
-                       filename : "updating",
-                       displaytype : "fullscreen",
-                       filetype : "updating"
-                   }
-                   if(data)
-                   {
-                       pubnub.publish(
-                           {
-                               channel: frontendChannel,
-                               message: data,
-                           },
-                           (status, response) => {
-                               console.log("Status Pubnub ===> ", status);
-                           }
-                       );
+                // if (frontendChannel) {
+                //     console.log("//=== yes frontend channel exist ===//")
+                //     let data = {
+                //         eventname: "play",
+                //         filename: "updating",
+                //         displaytype: "fullscreen",
+                //         filetype: "updating"
+                //     }
+                //     if (data) {
+                //         pubnub.publish(
+                //             {
+                //                 channel: frontendChannel,
+                //                 message: data,
+                //             },
+                //             (status, response) => {
+                //                 console.log("Status Pubnub ===> ", status);
+                //             }
+                //         );
 
-                       pubnub.publish(
-                        {
-                            channel: masterChannel,
-                            message: {
-                                mac_id :  publishChannel,
-                                eventname : "updatescreenresp",
-                                status : "started"
+                server.emit("updatingt", {
+                    "updatescreen": true,                    
+                });
+
+                        pubnub.publish(
+                            {
+                                channel: masterChannel,
+                                message: {
+                                    mac_id: publishChannel,
+                                    eventname: "updatescreenresp",
+                                    status: "started"
+                                },
+                                publishTimeout: 5*60000
                             },
-                        },
-                        (status, response) => {
-                            console.log("Status Pubnub ===> ", status);
-                        }
-                    );
-                   }  
+                            (status, response) => {
+                                console.log("Status Pubnub ===> ", status);
+                            }
+                        );
+                    // }
                 }
-                
+
                 update_screen = true;
                 // if(timer != null)
-                // {
+                //updatescreen/ {
                 //     console.log("Clearing timer for photo in Update Screen Function");
                 //     clearInterval(timer); 
                 // }           
-            }        
+            // }
         }
-    if(eventname && eventname == "updateScreenDisabled")
-    {
-        if(frontendChannel)
-        {
-           let data = {
-               eventname : "stop",
-               filename : "updating",
-               displaytype : "fullscreen",
-               filetype : "updating"
-           }
-           if(data)
-           {
-               pubnub.publish(
-                   {
-                       channel: frontendChannel,
-                       message: data,
-                   },
-                   (status, response) => {
-                       console.log("Status Pubnub ===> ", status);
-                   }
-               );
-           }  
-        }
-        update_screen = false;
-    }    
+        if (eventname && eventname == "updateScreenDisabled") {
+            // if (frontendChannel) {
+            //     let data = {
+            //         eventname: "stop",
+            //         filename: "updating",
+            //         displaytype: "fullscreen",
+            //         filetype: "updating"
+            //     }
+            //     if (data) {
+            //         pubnub.publish(
+            //             {
+            //                 channel: frontendChannel,
+            //                 message: data,
+            //             },
+            //             (status, response) => {
+            //                 console.log("Status Pubnub ===> ", status);
+            //             }
+            //         );
+            //     }
+            // }
 
-    }catch(e)
-    {
+            server.emit("updatingt", {
+                "updatescreen": false,                    
+            });
+
+            update_screen = false;
+        }
+
+    } catch (e) {
         console.log("Error in UpdateScreen Function")
-        return ;
+        return;
     }
-    
+
 }
 
 
@@ -1011,165 +1168,176 @@ function DownloadVideoZip(fileurl, zipname, filetype) {
         if (filetype == "video/mp4") {
             console.log(" //=== Video/mp4 ======//");
             //====> first check if video already downloaded
-            if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/Videos/${zipname}.mp4`)))
-            {
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/Videos/${zipname}.mp4`))) {
                 console.log("//=== File already exist =======//")
                 //===> Pubnub Publish of Download Completion ===>
-                let timer = setTimeout(()=>{
+                let timer = setTimeout(() => {
                     pubnub.publish(
                         {
                             channel: masterChannel,
                             message: {
-                                mac_id :  publishChannel,
-                                eventname : "Downloaded",
-                                status : "Video Already Exist",
-                                filename : zipname,
-                                filetype : "video/mp4"
+                                mac_id: publishChannel,
+                                eventname: "Downloaded",
+                                status: "Video Already Exist",
+                                filename: zipname,
+                                filetype: "video/mp4"
                             },
-                        },
-                        (status, response) => {
-                            console.log("Status Pubnub ===> ", status);
-                        }
-                    );
-                clearTimeout(timer)
-                },3000)
-                return ;
-            }
-            else 
-            {
-                const filePath = `${__dirname}/zippedfiles`;
-
-                download(file, filePath).then(() => {
-                    console.log("//==   Video Download Completed   ==//");
-    
-                    //============ Now unzip the file ==================//
-                    console.log("Inside Zip file name ==>", zipname);
-                    const path = `./zippedfiles/${zipname}.zip`;
-                    console.log("path ==>", path);
-    
-                    fs.createReadStream(path).pipe(
-                        unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
-                    );
-                    setTimeout(() => {
-                        fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
-                            console.log("deleted");
-                        });
-                    }, 1000);
-                    //===> Pubnub Publish of Download Completion ===>
-                    pubnub.publish(
-                        {
-                            channel: masterChannel,
-                            message: {
-                                mac_id :  publishChannel,
-                                eventname : "Downloaded",
-                                status : "Download Success",
-                                filename : zipname,
-                                filetype : "video/mp4"
-                            },
-                        },
-                        (status, response) => {
-                            console.log("Status Pubnub ===> ", status);
-                        }
-                    );
-
-
-                });
-            }            
-        } 
-        else if (filetype == "video/webm") {
-            console.log(" //=== Video/webm ======//");
-            //====> first check if video already downloaded
-            if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/Videos/${zipname}.webm`)))
-            {
-                console.log("//=== File already exist =======//")
-                //===> Pubnub Publish of Download Completion ===>
-                let timer = setTimeout(()=>{
-                    pubnub.publish(
-                        {
-                            channel: masterChannel,
-                            message: {
-                                mac_id :  publishChannel,
-                                eventname : "Downloaded",
-                                status : "Video Already Exist",
-                                filename : zipname,
-                                filetype : "video/webm"
-                            },
-                        },
-                        (status, response) => {
-                            console.log("Status Pubnub ===> ", status);
-                        }
-                    );
-                clearTimeout(timer)
-                },3000)
-                return ;
-            }
-            else 
-            {
-                const filePath = `${__dirname}/zippedfiles`;
-
-                download(file, filePath).then(() => {
-                    console.log("//==   Video Download Completed   ==//");
-    
-                    //============ Now unzip the file ==================//
-                    console.log("Inside Zip file name ==>", zipname);
-                    const path = `./zippedfiles/${zipname}.zip`;
-                    console.log("path ==>", path);
-    
-                    fs.createReadStream(path).pipe(
-                        unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
-                    );
-                    setTimeout(() => {
-                        fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
-                            console.log("deleted");
-                        });
-                    }, 1000);
-                    //===> Pubnub Publish of Download Completion ===>
-                    pubnub.publish(
-                        {
-                            channel: masterChannel,
-                            message: {
-                                mac_id :  publishChannel,
-                                eventname : "Downloaded",
-                                status : "Download Success",
-                                filename : zipname,
-                                filetype : "video/webm"
-                            },
-                        },
-                        (status, response) => {
-                            console.log("Status Pubnub ===> ", status);
-                        }
-                    );
-
-
-                });
-            }            
-        } 
-        else if (filetype == "image/jpeg") {
-            if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/images_ad/${zipname}.jpg`)))
-            {
-                console.log("//=== File already exist =======//")
-                let timer = setTimeout(()=>{
-                    pubnub.publish(
-                        {
-                            channel: masterChannel,
-                            message: {
-                                mac_id :  publishChannel,
-                                eventname : "Downloaded",
-                                status: "Image Already Exist",
-                                filename : zipname,
-                                filetype : "image/jpeg"
-                            },
+                            publishTimeout: 5*60000
                         },
                         (status, response) => {
                             console.log("Status Pubnub ===> ", status);
                         }
                     );
                     clearTimeout(timer)
-                },3000)
-                return ;
+                }, 3000)
+                return;
             }
-            else
-            {
+            else {
+                const filePath = `${__dirname}/zippedfiles`;
+
+                download(file, filePath).then(() => {
+                    console.log("//==   Video Download Completed   ==//");
+
+                    //============ Now unzip the file ==================//
+                    console.log("Inside Zip file name ==>", zipname);
+                    const path = `./zippedfiles/${zipname}.zip`;
+                    console.log("path ==>", path);
+
+                    try {
+
+                        fs.createReadStream(path).pipe(
+                            unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
+                        );
+
+                    } catch (e) {
+                        console.log("Error in Extracting Video From zipped content", e);
+                    }
+
+                    setTimeout(() => {
+                        try {
+                            fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
+                                console.log("deleted");
+                            });
+
+                        } catch (e) {
+                            console.log("Error in deleting zipped content", e);
+                        }
+                    }, 10000);
+                    //===> Pubnub Publish of Download Completion ===>
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id: publishChannel,
+                                eventname: "Downloaded",
+                                status: "Download Success",
+                                filename: zipname,
+                                filetype: "video/mp4"
+                            },
+                            publishTimeout: 5*60000
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
+
+
+                });
+            }
+        }
+        else if (filetype == "video/webm") {
+            console.log(" //=== Video/webm ======//");
+            //====> first check if video already downloaded
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/Videos/${zipname}.webm`))) {
+                console.log("//=== File already exist =======//")
+                //===> Pubnub Publish of Download Completion ===>
+                let timer = setTimeout(() => {
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id: publishChannel,
+                                eventname: "Downloaded",
+                                status: "Video Already Exist",
+                                filename: zipname,
+                                filetype: "video/webm"
+                            },
+                            publishTimeout: 5*60000
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
+                    clearTimeout(timer)
+                }, 3000)
+                return;
+            }
+            else {
+                const filePath = `${__dirname}/zippedfiles`;
+
+                download(file, filePath).then(() => {
+                    console.log("//==   Video Download Completed   ==//");
+
+                    //============ Now unzip the file ==================//
+                    console.log("Inside Zip file name ==>", zipname);
+                    const path = `./zippedfiles/${zipname}.zip`;
+                    console.log("path ==>", path);
+
+                    fs.createReadStream(path).pipe(
+                        unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
+                    );
+                    setTimeout(() => {
+                        fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
+                            console.log("deleted");
+                        });
+                    }, 1000);
+                    //===> Pubnub Publish of Download Completion ===>
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id: publishChannel,
+                                eventname: "Downloaded",
+                                status: "Download Success",
+                                filename: zipname,
+                                filetype: "video/webm"
+                            },
+                            publishTimeout: 5*60000
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
+
+
+                });
+            }
+        }
+        else if (filetype == "image/jpeg") {
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/images_ad/${zipname}.jpg`))) {
+                console.log("//=== File already exist =======//")
+                let timer = setTimeout(() => {
+                    pubnub.publish(
+                        {
+                            channel: masterChannel,
+                            message: {
+                                mac_id: publishChannel,
+                                eventname: "Downloaded",
+                                status: "Image Already Exist",
+                                filename: zipname,
+                                filetype: "image/jpeg"
+                            },
+                            publishTimeout: 5*60000
+                        },
+                        (status, response) => {
+                            console.log("Status Pubnub ===> ", status);
+                        }
+                    );
+                    clearTimeout(timer)
+                }, 3000)
+                return;
+            }
+            else {
                 const file = fileurl;
                 console.log("Image file url ==> ", fileurl);
                 //const filePath = `${__dirname}/zippedfiles`;
@@ -1181,12 +1349,13 @@ function DownloadVideoZip(fileurl, zipname, filetype) {
                         {
                             channel: masterChannel,
                             message: {
-                                mac_id :  publishChannel,
-                                eventname : "Downloaded",
+                                mac_id: publishChannel,
+                                eventname: "Downloaded",
                                 status: "Download Success",
-                                filename : zipname,
-                                filetype : "image/jpeg"
+                                filename: zipname,
+                                filetype: "image/jpeg"
                             },
+                            publishTimeout: 5*60000
                         },
                         (status, response) => {
                             console.log("Status Pubnub ===> ", status);
@@ -1197,8 +1366,6 @@ function DownloadVideoZip(fileurl, zipname, filetype) {
         }
     }
 }
-
-
 
 
 //==================== To Download BurnerAd ====================//
@@ -1216,42 +1383,41 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
         if (filetype == "video/mp4") {
             console.log(" //=== Video/mp4 ======//");
             //====> first check if video already downloaded
-            if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/BurnerAd/${zipname}.mp4`)))
-            {
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/BurnerAd/${zipname}.mp4`))) {
                 console.log("//=== File already exist =======//")
                 //===> Pubnub Publish of Download Completion ===>
-                let timer = setTimeout(()=>{
+                let timer = setTimeout(() => {
                     pubnub.publish(
                         {
                             channel: masterChannel,
                             message: {
-                                mac_id :  publishChannel,
-                                eventname : "Downloaded",
-                                status : "Video Already Exist",
-                                filename : zipname,
-                                filetype : "video/mp4"
+                                mac_id: publishChannel,
+                                eventname: "Downloaded",
+                                status: "Video Already Exist",
+                                filename: zipname,
+                                filetype: "video/mp4"
                             },
+                            publishTimeout: 5*60000
                         },
                         (status, response) => {
                             console.log("Status Pubnub ===> ", status);
                         }
                     );
-                clearTimeout(timer)
-                },3000)
-                return ;
+                    clearTimeout(timer)
+                }, 3000)
+                return;
             }
-            else 
-            {
+            else {
                 const filePath = `${__dirname}/zippedfiles`;
 
                 download(file, filePath).then(() => {
                     console.log("//==   Video Download Completed   ==//");
-    
+
                     //============ Now unzip the file ==================//
                     console.log("Inside Zip file name ==>", zipname);
                     const path = `./zippedfiles/${zipname}.zip`;
                     console.log("path ==>", path);
-    
+
                     fs.createReadStream(path).pipe(
                         unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/BurnerAd" })
                     );
@@ -1265,24 +1431,25 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
                         {
                             channel: masterChannel,
                             message: {
-                                mac_id :  publishChannel,
-                                eventname : "Downloaded",
-                                status : "Download Success",
-                                filename : zipname,
-                                filetype : "video/mp4"
+                                mac_id: publishChannel,
+                                eventname: "Downloaded",
+                                status: "Download Success",
+                                filename: zipname,
+                                filetype: "video/mp4"
                             },
+                            publishTimeout: 5*60000
                         },
                         (status, response) => {
                             console.log("Status Pubnub ===> ", status);
                             getBurnerAdFileName(burnarAdFolder);
-                            timer_burnerad = setInterval(playBurnerAd, 30000);
-                            
+                            timer_burnerad = setInterval(getBurnerAd, 30000); //getBurnerAd,playBurnerAd
+
                         }
                     );
 
 
                 });
-            }            
+            }
         }
         //  else if (filetype == "image/jpeg") {
         //     if(fs.existsSync(path.join(__dirname , `/Saps_Rasp_Pubnub/src/images_ad/${zipname}.jpg`)))
@@ -1308,32 +1475,32 @@ function DownloadBurnerAdZip(fileurl, zipname, filetype) {
         //         },3000)
         //         return ;
         //     }
-            // else
-            // {
-            //     const file = fileurl;
-            //     console.log("Image file url ==> ", fileurl);
-            //     //const filePath = `${__dirname}/zippedfiles`;
-            //     const filePath = `${__dirname}/Saps_Rasp_Pubnub/src/images_ad`;
-            //     download(file, filePath).then(() => {
-            //         console.log("//==  Image Download Completed   ==//");
-            //         //===> Pubnub Publish of Download Completion ===>
-            //         pubnub.publish(
-            //             {
-            //                 channel: masterChannel,
-            //                 message: {
-            //                     mac_id :  publishChannel,
-            //                     eventname : "Downloaded",
-            //                     status: "Download Success",
-            //                     filename : zipname,
-            //                     filetype : "image/jpeg"
-            //                 },
-            //             },
-            //             (status, response) => {
-            //                 console.log("Status Pubnub ===> ", status);
-            //             }
-            //         );
-            //     });
-            // }
+        // else
+        // {
+        //     const file = fileurl;
+        //     console.log("Image file url ==> ", fileurl);
+        //     //const filePath = `${__dirname}/zippedfiles`;
+        //     const filePath = `${__dirname}/Saps_Rasp_Pubnub/src/images_ad`;
+        //     download(file, filePath).then(() => {
+        //         console.log("//==  Image Download Completed   ==//");
+        //         //===> Pubnub Publish of Download Completion ===>
+        //         pubnub.publish(
+        //             {
+        //                 channel: masterChannel,
+        //                 message: {
+        //                     mac_id :  publishChannel,
+        //                     eventname : "Downloaded",
+        //                     status: "Download Success",
+        //                     filename : zipname,
+        //                     filetype : "image/jpeg"
+        //                 },
+        //             },
+        //             (status, response) => {
+        //                 console.log("Status Pubnub ===> ", status);
+        //             }
+        //         );
+        //     });
+        // }
         // }
     }
 }
@@ -1346,22 +1513,16 @@ const imageFolder = './Saps_Rasp_Pubnub/src/images_ad/';
 const videoFolder = './Saps_Rasp_Pubnub/src/Videos/';
 const burnarAdFolder = './Saps_Rasp_Pubnub/src/BurnerAd/';
 
-// function createdDate (fileFolder, file) {  
-//   const { birthtime } = fs.statSync(`${fileFolder}${file}`)
+async function readFileNameAndTime(fileFolder, filetype) {
 
-//   return birthtime
-// }
-
-async function readFileNameAndTime (fileFolder, filetype) { 
-    
-    try{
+    try {
 
         let file = await fs.promises.readdir(fileFolder)
 
         let body = {
-            files:file,
-            deviceMacId:publishChannel,
-            fileType:filetype
+            files: file,
+            deviceMacId: publishChannel,
+            fileType: filetype
         }
 
         let resp = await axios.post("http://api.postmyad.ai/api/device/deviceGallery/deviceFiles", body)
@@ -1372,152 +1533,154 @@ async function readFileNameAndTime (fileFolder, filetype) {
             {
                 channel: masterChannel,
                 message: {
-                    mac_id :  publishChannel,
-                    eventname : "resp_get_device_file",
+                    mac_id: publishChannel,
+                    eventname: "resp_get_device_file",
                     status: "Get Device File Success",
                 },
+                publishTimeout: 5*60000
             },
             (status, response) => {
                 console.log("Status Pubnub ===> ", status);
             }
         );
-        
-    }catch (error){
+
+    } catch (error) {
         console.log("Error From sendPhotoToServer====>", error)
-    }
-
-  }
-
-
-async function getUserFilesName(filetype) {
-
-    if(filetype === "video/mp4")
-    {
-        await readFileNameAndTime (videoFolder, filetype)
-    }
-    else if(filetype === "image/jpeg")
-    {
-        await readFileNameAndTime (imageFolder, filetype)
-    }
-    else if(filetype === "burnerad")
-    {
-        await readFileNameAndTime (burnarAdFolder, filetype)
     }
 
 }
 
 
-async function getBurnerAdFileName(fileFolder)
-{
+async function getUserFilesName(filetype) {
+
+    if (filetype === "video/mp4") {
+        await readFileNameAndTime(videoFolder, filetype)
+    }
+    if (filetype === "video/webm") {
+        await readFileNameAndTime(videoFolder, filetype)
+    }
+    if (filetype === "video/mov") {
+        await readFileNameAndTime(videoFolder, filetype)
+    }
+    else if (filetype === "image/jpeg") {
+        await readFileNameAndTime(imageFolder, filetype)
+    }
+    else if (filetype === "burnerad") {
+        await readFileNameAndTime(burnarAdFolder, filetype)
+    }
+
+}
+
+
+async function getBurnerAdFileName(fileFolder) {
     burnerad = await fs.promises.readdir(fileFolder)
+    console.log("burnerrrrrrrrrrr---->>>>>>>", burnerad);
 }
 
 getBurnerAdFileName(burnarAdFolder);
 
 
-function playBurnerAd()
-{
-    countwebCamList();
-    console.log("return After Cam Count ===>", cam);
+// function playBurnerAd() {
+//     countwebCamList();
+//     console.log("return After Cam Count ===>", cam);
 
-    if(!update_screen)
-    {
-        console.log("Burner ad list----->",burnerad.length);
+//     if (!update_screen) {
+//         console.log("Burner ad list----->", burnerad.length);
 
-        let data = {};
+//         let data = {};
 
-        data["webcam"] = cam === 14 ? false : true
-        data["cameraEvent"] = "camera"
-                                        
-        if (burnerad.length > 0)
-        {
-            const random = Math.floor(Math.random()*burnerad.length)
+//         data["webcam"] = cam === 14 ? false : true
+//         data["cameraEvent"] = "camera"
 
-            liveContentLink = null;
-            data["filetype"] = "burnerad";
-            data["filename"] = burnerad[random];
-            data["eventname"] = "stop";
-            data["displaytype"] = "fullscreen";
+//         if (burnerad.length > 0) {
+//             const random = Math.floor(Math.random() * burnerad.length)
 
-            if(frontendChannel)
-            {
-            pubnub.publish(
-                {
-                    channel: frontendChannel,
-                    message: data,
-                },
-                (status, response) => {
-                    console.log("Status Pubnub ===> ", status);
-                }
-            );
-            }
-            else{
-                liveContentLink = null;
-                data["filetype"] = null;
-                data["filename"] = null;  
-                data["eventname"] = "stop";
-                data["displaytype"] = "fullscreen";
+//             liveContentLink = null;
+//             data["filetype"] = "burnerad";
+//             data["filename"] = burnerad[random];
+//             data["eventname"] = "stop";
+//             data["displaytype"] = "fullscreen";
 
-                if(frontendChannel)
-                {
-                pubnub.publish(
-                    {
-                        channel: frontendChannel,
-                        message: data,
-                    },
-                    (status, response) => {
-                        console.log("Status Pubnub ===> ", status);
-                        burnerAdPlaying = true;
-                    }
-                );
-                }
-            }
-        }
-        else{
-            if(frontendChannel)
-            {
-            pubnub.publish(
-                {
-                    channel: frontendChannel,
-                    message: data,
-                },
-                (status, response) => {
-                    console.log("Status Pubnub ===> ", status);
-                }
-            );
-            }
-        }
-    }
-}
+//             if (frontendChannel) {
+//                 pubnub.publish(
+//                     {
+//                         channel: frontendChannel,
+//                         message: data,
+//                     },
+//                     (status, response) => {
+//                         console.log("Status Pubnub ===> ", status);
+//                     }
+//                 );
+//             }
+//             else {
+//                 liveContentLink = null;
+//                 data["filetype"] = null;
+//                 data["filename"] = null;
+//                 data["eventname"] = "stop";
+//                 data["displaytype"] = "fullscreen";
+
+//                 if (frontendChannel) {
+//                     pubnub.publish(
+//                         {
+//                             channel: frontendChannel,
+//                             message: data,
+//                         },
+//                         (status, response) => {
+//                             console.log("Status Pubnub ===> ", status);
+//                             burnerAdPlaying = true;
+//                         }
+//                     );
+//                 }
+//             }
+//         }
+//         else {
+//             if (frontendChannel) {
+//                 pubnub.publish(
+//                     {
+//                         channel: frontendChannel,
+//                         message: data,
+//                     },
+//                     (status, response) => {
+//                         console.log("Status Pubnub ===> ", status);
+//                     }
+//                 );
+//             }
+//         }
+//     }
+// }
 
 
 //=================== Delete files ==========================//
 // Saps_Rasp_Pubnub/src/Videos
+
 function DeleteUserFiles(uniquefilename, filetype) {
     console.log("//====== Delete user files ===== //");
 
-    if (filetype == "burnerad" && burnerAdPlaying)
-    {
-        const random = Math.floor(Math.random()*burnerad.length)
-                                
-        liveContentLink = null;
-        data["filetype"] = null;
-        data["filename"] = null;
-        data["eventname"] = "stop";
-        data["displaytype"] = "fullscreen";
+    if (filetype == "burnerad" && burnerAdPlaying) {
+        // const random = Math.floor(Math.random() * burnerad.length)
 
-        if(frontendChannel)
-        {
-           pubnub.publish(
-               {
-                   channel: frontendChannel,
-                   message: data,
-               },
-               (status, response) => {
-                   console.log("Status Pubnub ===> ", status);
-               }
-           );
-        }
+        // liveContentLink = null;
+        // data["filetype"] = null;
+        // data["filename"] = null;
+        // data["eventname"] = "stop";
+        // data["displaytype"] = "fullscreen";
+
+        // if (frontendChannel) {
+        //     pubnub.publish(
+        //         {
+        //             channel: frontendChannel,
+        //             message: data,
+        //         },
+        //         (status, response) => {
+        //             console.log("Status Pubnub ===> ", status);
+        //         }
+        //     );
+        // }
+
+        server.emit("stopcurrent", {
+            "stopcurrent": true,                    
+        });
+
     }
 
     if (filetype && uniquefilename) {
@@ -1528,26 +1691,31 @@ function DeleteUserFiles(uniquefilename, filetype) {
                     __dirname,
                     `/Saps_Rasp_Pubnub/src/Videos/${uniquefilename}`
                 )
-                : filetype && filetype == "image/jpeg"
+                : filetype && filetype == "video/webm"
                     ? path.join(
                         __dirname,
-                        `/Saps_Rasp_Pubnub/src/images_ad/${uniquefilename}`
+                        `/Saps_Rasp_Pubnub/src/Videos/${uniquefilename}`
                     )
-                    : filetype && filetype == "burnerad"
-                    ? path.join(
-                        __dirname,
-                        `/Saps_Rasp_Pubnub/src/BurnerAd/${uniquefilename}.mp4`
-                    )
-                    : null;
+                    : filetype && filetype == "image/jpeg"
+                        ? path.join(
+                            __dirname,
+                            `/Saps_Rasp_Pubnub/src/images_ad/${uniquefilename}`
+                        )
+                        : filetype && filetype == "burnerad"
+                            ? path.join(
+                                __dirname,
+                                `/Saps_Rasp_Pubnub/src/BurnerAd/${uniquefilename}.mp4`
+                            )
+                            : null;
         console.log("path == >", path1);
         if (fs.existsSync(path1)) {
             console.log("yes path exist");
             fs.unlinkSync(path1, () => {
                 console.log("User File Has Been Deleted Successfully");
 
-                if(!adPlaying)
-                {
-                    playBurnerAd();
+                if (!adPlaying) {
+                    // playBurnerAd();
+                    getBurnerAd();
                 }
 
             });
@@ -1558,77 +1726,73 @@ function DeleteUserFiles(uniquefilename, filetype) {
 }
 
 //=============================== Auto Starting Backend =====================================//
-async function frontendStart()
-{
-    let masterTimer = setTimeout(async() => {
-        let {stdout} =  await exec("npm start", { cwd: "./Saps_Rasp_Pubnub" });
-        if(stdout)
-        {
+async function frontendStart() {
+    let masterTimer = setTimeout(async () => {
+        let { stdout } = await exec("npm start", { cwd: "./Saps_Rasp_Pubnub" });
+        if (stdout) {
             console.log("//============== Frontend Has Been Started ============//")
-                let timer2  = setTimeout(async() => {
-                           // exec("chromium-browser --app=http://www.localhost:3000/ --kiosk",(err,stdout , stderr)=>{
-                        let {stdout} = exec("firefox http://www.localhost:3000 --kiosk")
-                        if(stdout)
-                        {
-                            console.log("//========= fireFox has been started =========//")
-                            let timer3 = setTimeout(()=>{
-                                let {stdout} = exec("xdotool search --sync --onlyvisible --name firefox key F11")
-                                if(stdout)
-                                {
-                                    console.log("//========= F11 Command has been executed ====//")
-                                    adPlaying = false;
-                                    frontendstarted = true;
+            let timer2 = setTimeout(async () => {
+                // exec("chromium-browser --app=http://www.localhost:3000/ --kiosk",(err,stdout , stderr)=>{
+                let { stdout } = exec("firefox http://www.localhost:3000 --kiosk")
+                if (stdout) {
+                    console.log("//========= fireFox has been started =========//")
+                    let timer3 = setTimeout(() => {
+                        let { stdout } = exec("xdotool search --sync --onlyvisible --name firefox key F11")
+                        if (stdout) {
+                            console.log("//========= F11 Command has been executed ====//")
+                            adPlaying = false;
+                            frontendstarted = true;
 
-                                    console.log("Clearing timer for BurnerAd in F11 Function function");
-                                    clearInterval(timer_burnerad);
+                            // console.log("Clearing timer for BurnerAd in F11 Function function");
+                            // clearInterval(timer_burnerad);
 
-                                    console.log("Burner ad list----->",burnerad.length);
+                            // console.log("Burner ad list----->",burnerad.length);
 
-                                    
-                                    if (burnerad.length > 0)
-                                    {
-                                        let data = {};
-                                        const random = Math.floor(Math.random()*burnerad.length)
-                                
-                                        liveContentLink = null;
-                                        data["filetype"] = "burnerad";
-                                        data["filename"] = burnerad[random];
-                                        data["eventname"] = "stop";
-                                        data["displaytype"] = "fullscreen";
-                            
-                                        if(frontendChannel)
-                                        {
-                                           pubnub.publish(
-                                               {
-                                                   channel: frontendChannel,
-                                                   message: data,
-                                               },
-                                               (status, response) => {
-                                                   console.log("Status Pubnub ===> ", status);
-                                                   burnerAdPlaying = true;
-                                               }
-                                           );
-                                        }
-                                        
-                                    }
-                                    console.log("Starting timer for BurnerAd in F11 Function function");
 
-                                    timer_burnerad = setInterval(playBurnerAd, 30000);
-                                    // else{
-                                    //     data["filetype"] = null;
-                                    //     data["filename"] = null;  
-                                    // }
+                            // if (burnerad.length > 0)
+                            // {
+                            //     let data = {};
+                            //     const random = Math.floor(Math.random()*burnerad.length)
+
+                            //     liveContentLink = null;
+                            //     data["filetype"] = "burnerad";
+                            //     data["filename"] = burnerad[random];
+                            //     data["eventname"] = "stop";
+                            //     data["displaytype"] = "fullscreen";
+
+                            //     if(frontendChannel)
+                            //     {
+                            //        pubnub.publish(
+                            //            {
+                            //                channel: frontendChannel,
+                            //                message: data,
+                            //            },
+                            //            (status, response) => {
+                            //                console.log("Status Pubnub ===> ", status);
+                            //                burnerAdPlaying = true;
+                            //            }
+                            //        );
+                            //     }
+
+                            // }
+                            // console.log("Starting timer for BurnerAd in F11 Function function");
+
+                            timer_burnerad = setInterval(getBurnerAd, 30000);  //getBurnerAd, playBurnerAd
+                            // else{
+                            //     data["filetype"] = null;
+                            //     data["filename"] = null;  
+                            // }
 
 
 
-                                }
-                                clearTimeout(timer3)
-                            },20000)
-                          
                         }
-                            clearTimeout(timer2)
-                            clearTimeout(masterTimer)
-                        }, 60000);
+                        clearTimeout(timer3)
+                    }, 20000)
+
+                }
+                clearTimeout(timer2)
+                clearTimeout(masterTimer)
+            }, 60000);
 
             // let timer2  = setTimeout(async() => {
             //                // exec("chromium-browser --app=http://www.localhost:3000/ --kiosk",(err,stdout , stderr)=>{
@@ -1690,33 +1854,42 @@ button.watch((err, value) => {
     }
     console.log("value ===>", value);
     if (value == 1) {
-        pubnub.publish(
-            {
-                channel: frontendChannel,
-                message: {
-                    eventname: "qrcode",
-                    show: true,
-                },
-            },
-            (status, response) => {
-                console.log("Status Pubnub ===> ", status);
-                console.log("response Pubnub ====> ", response);
-            }
-        );
+        // pubnub.publish(
+        //     {
+        //         channel: frontendChannel,
+        //         message: {
+        //             eventname: "qrcode",
+        //             show: true,
+        //         },
+        //     },
+        //     (status, response) => {
+        //         console.log("Status Pubnub ===> ", status);
+        //         console.log("response Pubnub ====> ", response);
+        //     }
+        // );
+
+        server.emit("showqr", {
+            "showqr": true,                    
+        });
+
     } else if (value == 0) {
-        pubnub.publish(
-            {
-                channel: frontendChannel,
-                message: {
-                    eventname: "qrcode",
-                    show: false,
-                },
-            },
-            (status, response) => {
-                console.log("Status Pubnub ===> ", status);
-                console.log("response Pubnub ====> ", response);
-            }
-        );
+        // pubnub.publish(
+        //     {
+        //         channel: frontendChannel,
+        //         message: {
+        //             eventname: "qrcode",
+        //             show: false,
+        //         },
+        //     },
+        //     (status, response) => {
+        //         console.log("Status Pubnub ===> ", status);
+        //         console.log("response Pubnub ====> ", response);
+        //     }
+        // );
+
+        server.emit("showqr", {
+            "showqr": false,                    
+        });
     }
     LED2.writeSync(value);
 });
@@ -1755,10 +1928,11 @@ parser.on("data", (data) => {
             {
                 channel: masterChannel,
                 message: {
-                    mac_id :  publishChannel,
-                    eventname : "shutdown",
-                    status : "shutdown"
+                    mac_id: publishChannel,
+                    eventname: "shutdown",
+                    status: "shutdown"
                 },
+                publishTimeout: 5*60000
             },
             (status, response) => {
                 console.log("Status Pubnub ===> ", status);
@@ -1877,7 +2051,7 @@ parser.on("data", (data) => {
         realmcadd.push(jsonVariable);
 
         let mcaddFrontend = [];       //===> For 
-        jsonVariable1= {macaddress : mcadd.concat("FrontEnd")}
+        jsonVariable1 = { macaddress: mcadd.concat("FrontEnd") }
         mcaddFrontend.push(jsonVariable1)
 
         //========== Generating JSON file with Mac addr BAse 64 Encoded  ======//
@@ -1890,7 +2064,7 @@ parser.on("data", (data) => {
             JSON.stringify(mcaddFrontend),
             "utf-8"
         );
-        
+
 
         //============= Generating QRCode =================================//
         var qr_code = qr.image(mcadd, { type: "png" });
@@ -1957,14 +2131,14 @@ parser.on("data", (data) => {
 //              }
 //         clearTimeout(updateTimer);
 //         },25000)
-            
+
 //             let timer = setTimeout(() => {
 //                 const child = spawn('npm i', {
 //                     stdio: 'inherit',
 //                     shell: true,
 //                     cwd: './'
 //                 })
-    
+
 //                 child.on('close', (code) => {               
 //                     console.log(`Backend Node modules ===>  ${code}`);
 //                 let child2 = spawn('npm i', {
@@ -1972,7 +2146,7 @@ parser.on("data", (data) => {
 //                         shell: true,
 //                         cwd: './Saps_Rasp_Pubnub'
 //                     })
-    
+
 //                 child2.on('close', (code)=>{
 //                     console.log("//==== Fronted Node Modules ===//")
 //                     execShellCommand().then(() => {
@@ -2003,109 +2177,117 @@ async function forceUpdater() {
     // let versionChecker = await updater.compareVersions();
     // console.log("version Checker value ===> ", versionChecker)
     // if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) {
-        console.log("//=== Verisons are not same ===//")
+    console.log("//=== Verisons are not same ===//")
 
-        let data = {
-            eventname : "play",
-            filename : "updating",
-            displaytype : "fullscreen",
-            filetype : "updating"
-        }
-        pubnub.publish(
-                {
-                    channel: frontendChannel,
-                    message: data,
-                },
-                (status, response) => {
-                    console.log("Status Pubnub ===> ", status);
-                }
-            ); 
+    // let data = {
+    //     eventname: "play",
+    //     filename: "updating",
+    //     displaytype: "fullscreen",
+    //     filetype: "updating"
+    // }
+    // pubnub.publish(
+    //     {
+    //         channel: frontendChannel,
+    //         message: data,
+    //     },
+    //     (status, response) => {
+    //         console.log("Status Pubnub ===> ", status);
+    //     }
+    // );
 
-        console.log("Clearing timer for BurnerAd in F11 Function function");
-        clearInterval(timer_burnerad);
 
-        let updateStatus = updater.forceUpdate();
+    server.emit("updatingt", {
+        "updatescreen": true,                    
+    });
 
-        // let updateStatus = await updater.autoUpdate();
+    console.log("Clearing timer for BurnerAd in F11 Function function");
+    clearInterval(timer_burnerad);
 
-        if(updateStatus)
-        {
-            //======> For updating the Frontend Screen
-           let updateTimer =  setTimeout(()=>{
-                if(frontendChannel)
-                {
-                     let data = {
-                        eventname : "play",
-                        filename : "updating",
-                        displaytype : "fullscreen",
-                        filetype : "updating"
-                    }
-                    pubnub.publish(
-                            {
-                                channel: frontendChannel,
-                                message: data,
-                            },
-                            (status, response) => {
-                                console.log("Status Pubnub ===> ", status);
-                            }
-                        ); 
+    let updateStatus = updater.forceUpdate();
 
-                        pubnub.publish(
-                            {
-                                channel: masterChannel,
-                                message: {
-                                    mac_id :  publishChannel,
-                                    eventname : "updateresp",
-                                    status : "started"
-                                },
-                            },
-                            (status, response) => {
-                                console.log("Status Pubnub ===> ", status);
-                            }
-                        );    
-                 }
+    // let updateStatus = await updater.autoUpdate();
+
+    if (updateStatus) {
+        //======> For updating the Frontend Screen
+        let updateTimer = setTimeout(() => {
+            // if (frontendChannel) {
+            //     let data = {
+            //         eventname: "play",
+            //         filename: "updating",
+            //         displaytype: "fullscreen",
+            //         filetype: "updating"
+            //     }
+            //     pubnub.publish(
+            //         {
+            //             channel: frontendChannel,
+            //             message: data,
+            //         },
+            //         (status, response) => {
+            //             console.log("Status Pubnub ===> ", status);
+            //         }
+            //     );
+
+            //     pubnub.publish(
+            //         {
+            //             channel: masterChannel,
+            //             message: {
+            //                 mac_id: publishChannel,
+            //                 eventname: "updateresp",
+            //                 status: "started"
+            //             },
+            //         },
+            //         (status, response) => {
+            //             console.log("Status Pubnub ===> ", status);
+            //         }
+            //     );
+            // }
+
+            server.emit("updatingt", {
+                "updatescreen": true,                    
+            });
+
             clearTimeout(updateTimer);
-            },25000)
-           
-            
+        }, 25000)
 
-            let timer = setTimeout(() => {
-                const child = spawn('npm i', {
+
+
+        let timer = setTimeout(() => {
+            const child = spawn('npm i', {
+                stdio: 'inherit',
+                shell: true,
+                cwd: './'
+            })
+
+            child.on('close', (code) => {
+                console.log(`Backend Node modules ===>  ${code}`);
+                let child2 = spawn('npm i', {
                     stdio: 'inherit',
                     shell: true,
-                    cwd: './'
+                    cwd: './Saps_Rasp_Pubnub'
                 })
-    
-                child.on('close', (code) => {               
-                    console.log(`Backend Node modules ===>  ${code}`);
-                let child2 = spawn('npm i', {
-                        stdio: 'inherit',
-                        shell: true,
-                        cwd: './Saps_Rasp_Pubnub'
-                    })
-    
-                child2.on('close', (code)=>{
-                    
+
+                child2.on('close', (code) => {
+
                     console.log("//==== Fronted Node Modules ===//")
 
                     execShellCommand().then(() => {
                         exec("pkill -f firefox")
-                        setTimeout(()=>{
+                        setTimeout(() => {
                             console.log("//=============== REBOOTING ================//")
                             exec("sudo reboot");
-                        },50000)
-                    });                    
+                        }, 50000)
+                    });
                     // exec("pkill -f firefox")
                     // setTimeout(()=>{
                     //     console.log("//=============== REBOOTING ================//")
                     //     exec("sudo reboot");
                     // },10000)
-                })    
-                });
-                console.log("//====== Timer Completed =====//")
-                clearTimeout(timer)
-            }, 5*60000)    ///===> timer for reboot ==>  5 min
-        }
+                })
+            });
+            console.log("//====== Timer Completed =====//")
+            clearTimeout(timer)
+        }, 5 * 60000)    ///===> timer for reboot ==>  5 min
+    }
     // }
     // else if (versionChecker.upToDate == true) {
     //     console.log("//==== Version is UpDated ===//")
@@ -2129,46 +2311,50 @@ async function autoUpdater() {
 
         let updateStatus = await updater.autoUpdate();
 
-        if(updateStatus)
-        {
+        if (updateStatus) {
             //======> For updating the Frontend Screen
-           let updateTimer =  setTimeout(()=>{
-                if(frontendChannel)
-                {
-                    let data = {
-                        eventname : "play",
-                        filename : "updating",
-                        displaytype : "fullscreen",
-                        filetype : "updating"
-                    }
-                    pubnub.publish(
-                            {
-                                channel: frontendChannel,
-                                message: data,
-                            },
-                            (status, response) => {
-                                console.log("Status Pubnub ===> ", status);
-                            }
-                        ); 
+            let updateTimer = setTimeout(() => {
+                // if (frontendChannel) {
+                //     let data = {
+                //         eventname: "play",
+                //         filename: "updating",
+                //         displaytype: "fullscreen",
+                //         filetype: "updating"
+                //     }
+                //     pubnub.publish(
+                //         {
+                //             channel: frontendChannel,
+                //             message: data,
+                //         },
+                //         (status, response) => {
+                //             console.log("Status Pubnub ===> ", status);
+                //         }
+                //     );
 
-                        pubnub.publish(
-                            {
-                                channel: masterChannel,
-                                message: {
-                                    mac_id :  publishChannel,
-                                    eventname : "updateresp",
-                                    status : "started"
-                                },
-                            },
-                            (status, response) => {
-                                console.log("Status Pubnub ===> ", status);
-                            }
-                        );    
-                 }
-            clearTimeout(updateTimer);
-            },25000)
-           
-            
+                //     pubnub.publish(
+                //         {
+                //             channel: masterChannel,
+                //             message: {
+                //                 mac_id: publishChannel,
+                //                 eventname: "updateresp",
+                //                 status: "started"
+                //             },
+                //         },
+                //         (status, response) => {
+                //             console.log("Status Pubnub ===> ", status);
+                //         }
+                //     );
+                // }
+
+
+                server.emit("updatingt", {
+                    "updatescreen": true,                    
+                });
+
+                clearTimeout(updateTimer);
+            }, 25000)
+
+
 
             let timer = setTimeout(() => {
                 const child = spawn('npm i', {
@@ -2176,36 +2362,36 @@ async function autoUpdater() {
                     shell: true,
                     cwd: './'
                 })
-    
-                child.on('close', (code) => {               
+
+                child.on('close', (code) => {
                     console.log(`Backend Node modules ===>  ${code}`);
-                let child2 = spawn('npm i', {
+                    let child2 = spawn('npm i', {
                         stdio: 'inherit',
                         shell: true,
                         cwd: './Saps_Rasp_Pubnub'
                     })
-    
-                child2.on('close', (code)=>{
-                    
-                    console.log("//==== Fronted Node Modules ===//")
 
-                    execShellCommand().then(() => {
-                        exec("pkill -f firefox")
-                        setTimeout(()=>{
-                            console.log("//=============== REBOOTING ================//")
-                            exec("sudo reboot");
-                        },50000)
-                    });                    
-                    // exec("pkill -f firefox")
-                    // setTimeout(()=>{
-                    //     console.log("//=============== REBOOTING ================//")
-                    //     exec("sudo reboot");
-                    // },10000)
-                })    
+                    child2.on('close', (code) => {
+
+                        console.log("//==== Fronted Node Modules ===//")
+
+                        execShellCommand().then(() => {
+                            exec("pkill -f firefox")
+                            setTimeout(() => {
+                                console.log("//=============== REBOOTING ================//")
+                                exec("sudo reboot");
+                            }, 50000)
+                        });
+                        // exec("pkill -f firefox")
+                        // setTimeout(()=>{
+                        //     console.log("//=============== REBOOTING ================//")
+                        //     exec("sudo reboot");
+                        // },10000)
+                    })
                 });
                 console.log("//====== Timer Completed =====//")
                 clearTimeout(timer)
-            }, 5*60000)    ///===> timer for reboot ==>  5 min
+            }, 5 * 60000)    ///===> timer for reboot ==>  5 min
         }
     }
     else if (versionChecker.upToDate == true) {
@@ -2219,62 +2405,816 @@ async function autoUpdater() {
 
 function execShellCommand() {
     return new Promise((resolve, reject) => {
-     exec("sudo apt-get install fswebcam", (error, stdout, stderr) => {
-      if (error) {
-       console.warn(error);
-      }
-      resolve(stdout? stdout : stderr);
-     });
+        exec("sudo apt-get install fswebcam", (error, stdout, stderr) => {
+            if (error) {
+                console.warn(error);
+            }
+            resolve(stdout ? stdout : stderr);
+        });
     });
-   }
-
-let scheduleJob;    
-
-async function autoUpdateTimer() {
- console.log("//====================== autoUpdateTimer() ======================  //")
- scheduleJob = schedule.scheduleJob('0 0 4 20 * *',async()=>{
- console.log("//== scheduleJob inside autoUpdateTime ==//")
- let versionChecker = await updater.compareVersions();
- console.log("version Checker value ===> ", versionChecker)
- if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) {
-     console.log("//=== Verisons are not same ===//")
-
-     console.log("Clearing timer for BurnerAd in F11 Function function");
-     clearInterval(timer_burnerad);
-
-     updater.forceUpdate();
-
-     let timer = setTimeout(() => {
-         const child = spawn('npm i', {
-             stdio: 'inherit',
-             shell: true,
-             cwd: './'
-         })
-
-         child.on('close', (code) => {                 //--> after build run the frontend
-             console.log(`child process exited with code ${code}`);
-         let child2 = spawn('npm i', {
-                 stdio: 'inherit',
-                 shell: true,
-                 cwd: './Saps_Rasp_Pubnub'
-             })
-
-         child2.on('close', (code)=>{
-            exec("pkill -f firefox")
-             setTimeout(()=>{
-                 exec("sudo reboot");
-             },15000)
-         })    
-         });
-         console.log("//====== Timer Completed =====//")
-         clearTimeout(timer)
-     }, 300000)
- }
- else if (versionChecker.upToDate == true) {
-     console.log("//==== Version is UpDated ===//")
-     return;
- }
-
- })
 }
 
+let scheduleJob;
+
+async function autoUpdateTimer() {
+    console.log("//====================== autoUpdateTimer() ======================  //")
+    scheduleJob = schedule.scheduleJob('0 0 4 20 * *', async () => {
+        console.log("//== scheduleJob inside autoUpdateTime ==//")
+        let versionChecker = await updater.compareVersions();
+        console.log("version Checker value ===> ", versionChecker)
+        if (versionChecker["remoteVersion"] && versionChecker.currentVersion != versionChecker.remoteVersion) {
+            console.log("//=== Verisons are not same ===//")
+
+            console.log("Clearing timer for BurnerAd in F11 Function function");
+            clearInterval(timer_burnerad);
+
+            updater.forceUpdate();
+
+            let timer = setTimeout(() => {
+                const child = spawn('npm i', {
+                    stdio: 'inherit',
+                    shell: true,
+                    cwd: './'
+                })
+
+                child.on('close', (code) => {                 //--> after build run the frontend
+                    console.log(`child process exited with code ${code}`);
+                    let child2 = spawn('npm i', {
+                        stdio: 'inherit',
+                        shell: true,
+                        cwd: './Saps_Rasp_Pubnub'
+                    })
+
+                    child2.on('close', (code) => {
+                        exec("pkill -f firefox")
+                        setTimeout(() => {
+                            exec("sudo reboot");
+                        }, 15000)
+                    })
+                });
+                console.log("//====== Timer Completed =====//")
+                clearTimeout(timer)
+            }, 300000)
+        }
+        else if (versionChecker.upToDate == true) {
+            console.log("//==== Version is UpDated ===//")
+            return;
+        }
+
+    })
+}
+
+
+
+
+async function getScheduleJson() {
+    let time = moment().format("YYYY-MM-DD");
+    if (publishChannel) {
+        console.log(time, publishChannel);
+        try {
+            axios.get(`http://api.postmyad.ai/api/schedule/getSchedulebyDate?date=${time}&macId=${publishChannel}`).then(resp => {
+                // console.log("SCHEDULE DATA", resp.data.msg);
+                if (fs.existsSync(`./Saps_Rasp_Pubnub/src/schedule/hello.json`)) {
+                    console.log(`hello.json File already exist`);
+
+                    deleteFilesAftertwoHours(1000); 
+
+                    // read arr
+                    let olddata = fs.readFileSync(`./Saps_Rasp_Pubnub/src/schedule/hello.json`, "utf-8");
+                    console.log("readSchJson inside json file ==> ", JSON.parse(olddata));
+                    
+                    // schJsonData = JSON.parse(olddata);
+                    // response arr
+                    let ret = getScheduleJsonIterate(resp.data.msg)
+                    // merge both
+                    let newArr = [...ret,...olddata]
+                    
+                    // update json
+                    fs.writeFileSync(`./Saps_Rasp_Pubnub/src/schedule/hello.json`, JSON.stringify(newArr), "utf-8");
+                    
+                    readScheduleJson();
+                    let timer2 = setTimeout(async () => {
+                        console.log("Deleting Old File 2 Hr Older Content-------->>>>>>>");
+                        deleteFilesAftertwoHours(1000);
+                        clearTimeout(timer2);
+                    }, 1000);
+
+                    let timer3 = setTimeout(async () => {
+                        console.log("Downloading New Media Content to New Location -------->>>>>>>");
+                        getScheduleMediaDownloadForNewContent();
+                        clearTimeout(timer3);
+                    }, 10000);
+                    
+                }
+                else {
+                    console.log(`hello.json File dose not exist creating`);
+                    let ret = getScheduleJsonIterate(resp.data.msg)
+
+                    // console.log("Ret value before writing it to file===>", ret);
+
+                    console.log("=====================================>");
+
+                    fs.writeFileSync(`./Saps_Rasp_Pubnub/src/schedule/hello.json`, JSON.stringify(ret), "utf-8");
+                
+
+                if (fs.existsSync(`./Saps_Rasp_Pubnub/src/schedule/hello.json`)) {
+                    console.log(`hello.json File already exist Download File `);
+                    readScheduleJson();
+                    let timer2 = setTimeout(async () => {
+                        console.log("Deleting Old File 2 Hr Older Content-------->>>>>>>");
+                        deleteFilesAftertwoHours(1000);
+                        clearTimeout(timer2);
+                    }, 1000);
+
+                    let timer3 = setTimeout(async () => {
+                        console.log("Downloading Schedued Media Content From json-------->>>>>>>");
+                        getScheduleMediaDownload();
+                        clearTimeout(timer3);
+                    }, 10000);
+
+                }
+            }
+
+            });
+        } catch (err) {
+            console.log("Error from dateListSchedule", err.message)
+        }
+    }
+}
+
+let schJsonData
+function readScheduleJson() {
+    let time = moment().format("YYYY-MM-DD");
+
+    let readSchJson = fs.readFileSync(`./Saps_Rasp_Pubnub/src/schedule/hello.json`, "utf-8");
+    console.log("readSchJson inside json file ==> ", JSON.parse(readSchJson));
+    schJsonData = JSON.parse(readSchJson);
+    // console.log("mcadd inside get_mac ===> ", mcadd);
+}
+
+
+
+function getScheduleJsonIterate(schdata) {
+    let arr = []
+    for (let i = 0; i < schdata.length; i++) {
+        if (new Date(schdata[i].scheduleDate).getTime() > new Date().getTime()) {
+            console.log("inside getScheduleJson", schdata[i]); 
+            
+                if (schdata[i].filetype === "image/jpeg") {
+                    schdata[i].contentLink = schdata[i].contentLink.replace("thumbnails", "fullimages").replace(".png", ".jpg");
+                    arr.push(schdata[i])
+                }
+                else if(schdata[i].filetype === "video/mp4" || schdata[i].filetype === "video/webm" || schdata[i].filetype === "video/mov"){
+                    schdata[i].contentLink = schdata[i].contentLink.replace("compressedvideos", "originalvideos").replace("compressed", "");
+                    arr.push(schdata[i])
+                }else
+                {
+                    arr.push(schdata[i])
+                }
+                        
+        }
+    }
+    return arr
+}
+
+function getScheduleMediaDownload() {
+
+    checkSpace();
+
+    let item1;
+
+    for (let item of schJsonData) {
+        if (item1 !== item.contentLink) {
+            item1 = item.contentLink
+
+            DownloadVideo(
+                // ==> Download Function
+                item.contentLink,
+                item.videoname,
+                item.filetype
+            );
+        }
+    }
+}
+
+
+function getScheduleMediaDownloadForNewContent() {
+
+    checkSpace();
+
+    let item1;
+
+    for (let item of schJsonData) {
+        if (item1 !== item.contentLink) {
+            item1 = item.contentLink
+
+            DownloadVideoNewLocation(
+                // ==> Download Function
+                item.contentLink,
+                item.videoname,
+                item.filetype
+            );
+        }
+    }
+}
+
+
+function deleteScheduleJson() {
+    // let time = moment().format("YYYY-MM-DD");
+    // if(fs.existsSync(`./Saps_Rasp_Pubnub/src/schedule/${time}.json`)){
+    // fs.unlinkSync(`./Saps_Rasp_Pubnub/src/schedule/${time}.json`);
+    // }
+
+    dir_schedule = null;
+
+    fs.rmSync("./Saps_Rasp_Pubnub/src/schedule", { recursive: true, force: true });
+
+    deleteScheduleMedia();
+
+    if (!dir_schedule) {
+        dir_schedule = path.join(__dirname, "./Saps_Rasp_Pubnub/src/schedule")
+        if (!fs.existsSync(dir_schedule)) {
+            console.log("Creating schedule Folder===")
+            fs.mkdirSync(dir_schedule)
+        } else {
+            console.log("===== schedule Folder Already Exist=====")
+        }
+    }
+
+}
+function deleteScheduleMedia() {
+    fs.rmSync("./Saps_Rasp_Pubnub/src/Videos", { recursive: true, force: true });
+    fs.rmSync("./Saps_Rasp_Pubnub/src/images_ad", { recursive: true, force: true });
+
+    dir_videos = null;
+    dir_images_ad = null;
+
+    if (!dir_videos) {
+        dir_videos = path.join(__dirname, "./Saps_Rasp_Pubnub/src/Videos")
+        if (!fs.existsSync(dir_videos)) {
+            console.log("Creating Videos Folder===")
+            fs.mkdirSync(dir_videos)
+        } else {
+            console.log("===== Videos Folder Already Exist=====")
+        }
+    }
+
+    if (!dir_images_ad) {
+        dir_images_ad = path.join(__dirname, "./Saps_Rasp_Pubnub/src/images_ad")
+        if (!fs.existsSync(dir_images_ad)) {
+            console.log("Creating images_ad Folder===")
+            fs.mkdirSync(dir_images_ad)
+        } else {
+            console.log("===== images_ad Folder Already Exist=====")
+        }
+    }
+
+}
+
+async function getBurnerAd() {
+
+    let dataJson = {};
+    await getBurnerAdFileName(burnarAdFolder);
+
+    countwebCamList();
+    console.log("return After Cam Count ===>", cam);
+    let camStat = (cam === 14) ? false : true
+
+
+
+    if (!update_screen) {
+        console.log("Burner ad list----->", burnerad.length);
+
+        if (burnerad.length > 0) {
+            server.emit("burnerAdEvent", {
+                "camera": camStat,
+                "burnerAd": true,
+                "list": burnerad
+            })
+
+        
+            if (fs.existsSync(`./Saps_Rasp_Pubnub/src/data.json`)) {
+                console.log(`data.json File already exist`);
+                
+                dataJson["camera"] = camStat;
+                dataJson["burnerAd"] = true;
+                dataJson["list"] = burnerad;
+                fs.writeFileSync(`./Saps_Rasp_Pubnub/src/data.json`, JSON.stringify(dataJson), "utf-8");
+            
+            }    
+
+        } else {
+            server.emit("burnerAdEvent", {
+                "camera": camStat,
+                "burnerAd": false,
+                "list": []
+            })
+
+            if (fs.existsSync(`./Saps_Rasp_Pubnub/src/data.json`)) {
+                console.log(`data.json File already exist`);
+                
+                dataJson["camera"] = camStat;
+                dataJson["burnerAd"] = true;
+                dataJson["list"] = [];
+                fs.writeFileSync(`./Saps_Rasp_Pubnub/src/data.json`, JSON.stringify(dataJson), "utf-8");
+            
+            }  
+        }
+
+    }
+}
+
+//  ======================== Delete video image folder files ==================== //
+function deleteFilesAftertwoHours(time) {
+    // let time = moment().format("YYYY-MM-DD");
+    if (fs.existsSync(`./Saps_Rasp_Pubnub/src/schedule/hello.json`)) {
+        console.log(" ===== deleteFilesAftertwoHours ====== ");
+
+        let newList = schJsonData.filter((item) => new Date(item.scheduleDate).getTime() > new Date().getTime() - time)
+        // deleteMediaFile(schJsonData)
+        console.log("Filtered Data ==>", schJsonData);
+        console.log("after Filter ==>", newList);
+
+        fs.writeFileSync(`./Saps_Rasp_Pubnub/src/schedule/hello.json`, JSON.stringify(newList), "utf-8");
+    }
+}
+
+function deleteMediaFile(arr) {
+    for (let item of arr) {
+        if (item.filetype === "video/mp4") {
+            DeleteUserFiles(item.videoname + ".mp4", item.filetype);
+        }
+        if (item.filetype === "video/webm") {
+            DeleteUserFiles(item.videoname + ".webm", item.filetype);
+        }
+        if (item.filetype === "image/jpeg") {
+            DeleteUserFiles(item.videoname + ".jpg", item.filetype);
+        }
+
+    }
+}
+// deleteFilesAftertwoHours()
+getBurnerAd();
+
+
+
+
+//==================== To Download Video ====================//
+function DownloadVideo(fileurl, zipname, filetype) {
+    console.log("Inside DownloadVideoZip ==> ", fileurl);
+    if (fileurl && zipname && filetype) {
+        const file = fileurl;
+
+        checkSpace();
+
+        //===> for video download ====>
+        if (filetype == "video/mp4") {
+            console.log(" //=== Video/mp4 ======//");
+            //====> first check if video already downloaded
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/Videos/${zipname}.mp4`))) {
+                console.log("//=== File already exist =======//")
+                //===> Pubnub Publish of Download Completion ===>
+                let timer = setTimeout(() => {
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Video Already Exist",
+                    //             filename: zipname,
+                    //             filetype: "video/mp4"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+                    clearTimeout(timer)
+                }, 3000)
+                return;
+            }
+            else {
+                const filePath = "./Saps_Rasp_Pubnub/src/Videos";
+
+                download(file, filePath).then(() => {
+                    console.log("//==   Video Download Completed   ==//");
+
+                    //============ Now unzip the file ==================//
+                    console.log("Inside Videos Folder file name ==>", zipname);
+                    // const path = `./zippedfiles/${zipname}.zip`;
+                    // console.log("path ==>", path);
+
+                    // try{
+
+                    //     fs.createReadStream(path).pipe(
+                    //             unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
+                    //     );
+
+                    // }catch(e){
+                    //     console.log("Error in Extracting Video From zipped content",e);
+                    // }
+
+                    // setTimeout(() => {
+                    //     try{
+                    //         fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
+                    //             console.log("deleted");
+                    //         });
+
+                    //     }catch(e){
+                    //         console.log("Error in deleting zipped content",e);
+                    //     }
+                    // }, 10000);
+                    //===> Pubnub Publish of Download Completion ===>
+                    
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Download Success",
+                    //             filename: zipname,
+                    //             filetype: "video/mp4"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+
+
+                });
+            }
+        }
+        else if (filetype == "video/webm") {
+            console.log(" //=== Video/webm ======//");
+            //====> first check if video already downloaded
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/Videos/${zipname}.webm`))) {
+                console.log("//=== File already exist =======//")
+                //===> Pubnub Publish of Download Completion ===>
+                let timer = setTimeout(() => {
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Video Already Exist",
+                    //             filename: zipname,
+                    //             filetype: "video/webm"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+                    clearTimeout(timer)
+                }, 3000)
+                return;
+            }
+            else {
+                const filePath = "./Saps_Rasp_Pubnub/src/Videos";
+
+                download(file, filePath).then(() => {
+                    console.log("//==   Video Download Completed   ==//");
+
+                    //============ Now unzip the file ==================//
+                    console.log("Inside Video Folder file name ==>", zipname);
+                    // const path = `./zippedfiles/${zipname}.zip`;
+                    // console.log("path ==>", path);
+
+                    // try{
+
+                    //     fs.createReadStream(path).pipe(
+                    //             unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
+                    //     );
+
+                    // }catch(e){
+                    //     console.log("Error in Extracting Video From zipped content",e);
+                    // }
+
+                    // setTimeout(() => {
+                    //     try{
+                    //         fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
+                    //             console.log("deleted");
+                    //         });
+
+                    //     }catch(e){
+                    //         console.log("Error in deleting zipped content",e);
+                    //     }
+                    // }, 10000);
+                    //===> Pubnub Publish of Download Completion ===>
+                    
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Download Success",
+                    //             filename: zipname,
+                    //             filetype: "video/webm"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+
+
+                });
+            }
+        }
+        else if (filetype == "image/jpeg") {
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/images_ad/${zipname}.jpg`))) {
+                console.log("//=== File already exist =======//")
+                let timer = setTimeout(() => {
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Image Already Exist",
+                    //             filename: zipname,
+                    //             filetype: "image/jpeg"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+                    clearTimeout(timer)
+                }, 3000)
+                return;
+            }
+            else {
+                const file = fileurl;
+                console.log("Image file url ==> ", fileurl);
+                //const filePath = `${__dirname}/zippedfiles`;
+                const filePath = `${__dirname}/Saps_Rasp_Pubnub/src/images_ad`;
+                download(file, filePath).then(() => {
+                    console.log("//==  Image Download Completed   ==//");
+                    //===> Pubnub Publish of Download Completion ===>
+                    
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Download Success",
+                    //             filename: zipname,
+                    //             filetype: "image/jpeg"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+                });
+            }
+        }
+    }
+}
+
+
+function DownloadVideoNewLocation(fileurl, zipname, filetype) {
+    console.log("Inside DownloadVideoZip ==> ", fileurl);
+    if (fileurl && zipname && filetype) {
+        const file = fileurl;
+
+
+        //===> for video download ====>
+        if (filetype == "video/mp4") {
+            console.log(" //=== Video/mp4 ======//");
+            //====> first check if video already downloaded
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/NewVideos/${zipname}.mp4`))) {
+                console.log("//=== File already exist =======//")
+                //===> Pubnub Publish of Download Completion ===>
+                let timer = setTimeout(() => {
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Video Already Exist",
+                    //             filename: zipname,
+                    //             filetype: "video/mp4"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+                    clearTimeout(timer)
+                }, 3000)
+                return;
+            }
+            else {
+                const filePath = "./Saps_Rasp_Pubnub/src/NewVideos";
+
+                download(file, filePath).then(() => {
+                    console.log("//==   Video Download Completed   ==//");
+
+                    //============ Now unzip the file ==================//
+                    console.log("Inside NewVideos Folder file name ==>", zipname);
+                    // const path = `./zippedfiles/${zipname}.zip`;
+                    // console.log("path ==>", path);
+
+                    // try{
+
+                    //     fs.createReadStream(path).pipe(
+                    //             unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
+                    //     );
+
+                    // }catch(e){
+                    //     console.log("Error in Extracting Video From zipped content",e);
+                    // }
+
+                    // setTimeout(() => {
+                    //     try{
+                    //         fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
+                    //             console.log("deleted");
+                    //         });
+
+                    //     }catch(e){
+                    //         console.log("Error in deleting zipped content",e);
+                    //     }
+                    // }, 10000);
+                    //===> Pubnub Publish of Download Completion ===>
+                    
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Download Success",
+                    //             filename: zipname,
+                    //             filetype: "video/mp4"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+
+
+                });
+            }
+        }
+        else if (filetype == "video/webm") {
+            console.log(" //=== Video/webm ======//");
+            //====> first check if video already downloaded
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/NewVideos/${zipname}.webm`))) {
+                console.log("//=== File already exist =======//")
+                //===> Pubnub Publish of Download Completion ===>
+                let timer = setTimeout(() => {
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Video Already Exist",
+                    //             filename: zipname,
+                    //             filetype: "video/webm"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+                    clearTimeout(timer)
+                }, 3000)
+                return;
+            }
+            else {
+                const filePath = "./Saps_Rasp_Pubnub/src/NewVideos";
+
+                download(file, filePath).then(() => {
+                    console.log("//==   Video Webm Download Completed   ==//");
+
+                    //============ Now unzip the file ==================//
+                    console.log("Inside NewVideos Folder file name ==>", zipname);
+                    // const path = `./zippedfiles/${zipname}.zip`;
+                    // console.log("path ==>", path);
+
+                    // try{
+
+                    //     fs.createReadStream(path).pipe(
+                    //             unzipper.Extract({ path: "./Saps_Rasp_Pubnub/src/Videos" })
+                    //     );
+
+                    // }catch(e){
+                    //     console.log("Error in Extracting Video From zipped content",e);
+                    // }
+
+                    // setTimeout(() => {
+                    //     try{
+                    //         fs.unlinkSync(`./zippedfiles/${zipname}.zip`, () => {
+                    //             console.log("deleted");
+                    //         });
+
+                    //     }catch(e){
+                    //         console.log("Error in deleting zipped content",e);
+                    //     }
+                    // }, 10000);
+                    //===> Pubnub Publish of Download Completion ===>
+
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Download Success",
+                    //             filename: zipname,
+                    //             filetype: "video/webm"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+
+
+                });
+            }
+        }
+        else if (filetype == "image/jpeg") {
+            if (fs.existsSync(path.join(__dirname, `/Saps_Rasp_Pubnub/src/new_images_ad/${zipname}.jpg`))) {
+                console.log("//=== File already exist =======//")
+                let timer = setTimeout(() => {
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Image Already Exist",
+                    //             filename: zipname,
+                    //             filetype: "image/jpeg"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+                    clearTimeout(timer)
+                }, 3000)
+                return;
+            }
+            else {
+                const file = fileurl;
+                console.log("Image file url ==> ", fileurl);
+                //const filePath = `${__dirname}/zippedfiles`;
+                const filePath = `${__dirname}/Saps_Rasp_Pubnub/src/new_images_ad`;
+                download(file, filePath).then(() => {
+                    console.log("//==  Image Download Completed   ==//");
+                    //===> Pubnub Publish of Download Completion ===>
+                    // pubnub.publish(
+                    //     {
+                    //         channel: masterChannel,
+                    //         message: {
+                    //             mac_id: publishChannel,
+                    //             eventname: "Downloaded",
+                    //             status: "Download Success",
+                    //             filename: zipname,
+                    //             filetype: "image/jpeg"
+                    //         },
+                    //     },
+                    //     (status, response) => {
+                    //         console.log("Status Pubnub ===> ", status);
+                    //     }
+                    // );
+                });
+            }
+        }
+    }
+}
+
+function moveContentFromNewLocationToOld()
+{
+    //deleting Media Folder AT 00:00
+    deleteScheduleMedia();
+  
+
+        fs.rename("./Saps_Rasp_Pubnub/src/new_images_ad","./Saps_Rasp_Pubnub/src/images_ad", (err) => {
+           
+        });
+
+    
+            fs.rename("./Saps_Rasp_Pubnub/src/NewVideos","./Saps_Rasp_Pubnub/src/Videos", (err) => {
+                // if(err) console.log(err);
+                // console.log(`File ${fileName} moved successfully`)
+            });
+              
+}
+
+async function restartFrontend(){
+    server.emit("reloadPage");
+}
