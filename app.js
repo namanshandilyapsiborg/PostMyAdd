@@ -46,6 +46,8 @@ console.log("versionnnnnnn", version);
 
 // let time = moment();
 
+let timer = null;
+
 //------------------------------------------- Socket.io--------------------------------------------//
 
 const server = new socketio.Server(httpServer, {
@@ -228,7 +230,7 @@ var adPlaying = false;
 
 var burnerAdPlaying = false;
 var update_screen = false;
-let timer = null;
+
 let timer_burnerad = null;
 var image;
 
@@ -339,7 +341,7 @@ async function getChannel() {
     }
 }
 
-getChannel()
+// getChannel()
 
 //========================= PUBNUB LISTENER ====================//
 
@@ -410,6 +412,41 @@ async function adlistner() {
                             messageEvent.message.filetype
                         );
                     }
+
+
+                    if (messageEvent.message.eventname == "force reboot") {
+                        console.log("//=== Rebooting ForceFully =========//")
+                        exec("sudo reboot")
+                    }
+
+                    if (messageEvent.message.eventname == "space available") {
+                        console.log("//===Checking Disk Space =========//")
+                        checkSpace();
+                    }
+                    if (messageEvent.message.eventname == "download_schedule_file") {
+                        console.log("//=== download_schedule_file =========//")
+                        getScheduleJson();
+
+                    }
+                    if (messageEvent.message.eventname == "delete_schedule_file") {
+                        console.log("//=== delete_schedule_file =========//")
+                        deleteScheduleJson();
+                        // deleteScheduleMedia();
+                        // moveContentFromNewLocationToOld();
+
+                    }
+                    if (messageEvent.message.eventname == "download_schedule_file_extra") {
+                        console.log("//=== delete_schedule_file =========//")
+                        // deleteScheduleJson();
+                        // deleteScheduleMedia();
+                        moveContentFromNewLocationToOld();
+
+                    }
+
+                    if (messageEvent.message.eventname == "restart_frontend") {
+                        console.log("//=== restart_frontend =========//")
+                        restartFrontend();
+                    } 
 
                 }
 
@@ -580,7 +617,7 @@ async function adlistner() {
 
 }
 
-adlistner();
+// adlistner();
 
 function checkWifiConnection() {
 
@@ -646,6 +683,10 @@ checkWifiConnection().then((data) => {
 
 async function restart() {
     if (await fs.existsSync("./realmacadd.json") && await fs.existsSync("./frontendMac.json")) {
+
+        await getChannel();
+
+        await adlistner();
 
         deleteScheduleJson();
 

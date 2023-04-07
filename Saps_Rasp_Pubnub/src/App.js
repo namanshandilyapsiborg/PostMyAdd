@@ -115,7 +115,10 @@ function App() {
   // Play
 
   function reloadAd() {
-     const random = Math.floor(Math.random() * burnerad?.list?.length);
+
+    socket.emit("stop", {"orderId": "item.orderId"})
+
+    const random = Math.floor(Math.random() * burnerad?.list?.length);
  
     console.log("burneradddddddd", burnerad?.list[random]);
     setBurnerVideoname(burnerad?.list[random]);
@@ -276,7 +279,7 @@ function App() {
         reloadAd()
       }
       else if(updatescreen && !showqrcode){
-        if (item.filetype === "updating" ) {
+        // if (item.filetype === "updating" ) {
           console.log("========================updating")
           
             // socket.emit("play", {"orderId": item.orderId})
@@ -286,7 +289,7 @@ function App() {
             setFiletype(updating)
               playmedia()
           
-        }
+        // }
       }
     }
 
@@ -314,7 +317,7 @@ function App() {
 
     socket.on("reloadPage", function() {
       console.log("Reloading Page To get New Content To Be Playes socket.io");
-      location.reload();
+      window.location.reload();
     })
    
   }, [])
