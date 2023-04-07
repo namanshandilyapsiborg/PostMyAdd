@@ -61,12 +61,32 @@ server.on('connection', (client) => {
     client.on('play', data => {
         console.log("play =>", data)
         orderId = data.orderId;
+        second = data.second;
 
         console.log("Clearing timer for photo in play function");
         clearInterval(timer);
 
         // start timer to click photo
         console.log("Starting timer for photo");
+
+                pubnub.publish(
+                    {
+                        channel: masterChannel,
+                        message: {
+                            mac_id: publishChannel,
+                            eventname: "playresp",
+                            orderId: orderId,
+                            second: second,
+                            status: "played"
+                        },
+                        publishTimeout: 5*60000
+                    },
+                    (status, response) => {
+                        console.log("Status Pubnub ===> ", status);
+                    }
+                );
+
+
         timer = setInterval(click_photo, 5000);
     })
     client.on('stop', data => {

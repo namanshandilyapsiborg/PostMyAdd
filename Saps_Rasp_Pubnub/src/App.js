@@ -153,7 +153,7 @@ function App() {
       if (item.filetype === "url" && (new Date(item.scheduleDate).getTime() >= new Date().getTime())) {
         setTimeout(() => {
           setCurrentPlay(true);
-            socket.emit("play", {"orderId": item.orderId})
+          socket.emit("play", {"orderId": item.orderId, "second": item.scheduleDate})
         
           console.log("========================Url")
           setFullscreenvideostatus(true)
@@ -173,7 +173,7 @@ function App() {
         setTimeout(() => {
           console.log("setTimeOut", item.videoname, item.filetype );
           setCurrentPlay(true);
-          socket.emit("play", {"orderId": item.orderId})
+          socket.emit("play", {"orderId": item.orderId, "second": item.scheduleDate})
           setFullscreenvideostatus(true)
           setDisplaytype("fullscreen")
           setImagename(item.videoname)
@@ -188,7 +188,7 @@ function App() {
         console.log("========================webm")
         setTimeout(() => {
           setCurrentPlay(true);
-          socket.emit("play", {"orderId": item.orderId})
+          socket.emit("play", {"orderId": item.orderId, "second": item.scheduleDate})
 
           console.log("========================Inside TimeOUT WEBM")
 
@@ -206,7 +206,7 @@ function App() {
         console.log("========================mp4")
         setTimeout(() => {
           setCurrentPlay(true);
-          socket.emit("play", {"orderId": item.orderId})
+          socket.emit("play", {"orderId": item.orderId, "second": item.scheduleDate})
 
           setFiletype(item.filetype)
           console.log("========================mp4 item.filetype",item.filetype)
@@ -224,7 +224,7 @@ function App() {
         console.log("========================mov")
         setTimeout(() => {
           setCurrentPlay(true);
-          socket.emit("play", {"orderId": item.orderId})
+          socket.emit("play", {"orderId": item.orderId, "second": item.scheduleDate})
 
           setFullscreenvideostatus(true)
           setDisplaytype("fullscreen")
